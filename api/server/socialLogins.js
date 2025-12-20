@@ -12,6 +12,7 @@ const {
   githubLogin,
   appleLogin,
   setupSaml,
+  setupAIPass,
 } = require('~/strategies');
 const { getLogStores } = require('~/cache');
 
@@ -93,6 +94,14 @@ const configureSocialLogins = async (app) => {
     setupSaml();
 
     logger.info('SAML Connect configured.');
+  }
+
+  // AIPass OAuth2 Configuration
+  if (process.env.AIPASS_CLIENT_ID) {
+    logger.info('Configuring AIPass OAuth2...');
+    // AIPass uses custom state store (not express-session) for PKCE state management
+    await setupAIPass();
+    logger.info('AIPass OAuth2 configured successfully.');
   }
 };
 

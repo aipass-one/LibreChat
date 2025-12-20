@@ -129,7 +129,7 @@ interface:
 
 # Example Registration Object Structure (optional)
 registration:
-  socialLogins: ['github', 'google', 'discord', 'openid', 'facebook', 'apple', 'saml']
+  socialLogins: ['github', 'google', 'discord', 'openid', 'facebook', 'apple', 'saml', 'aipass']
   # allowedDomains:
   # - "gmail.com"
 
@@ -254,6 +254,22 @@ endpoints:
   #   # (optional) Agent Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
   #   capabilities: ["execute_code", "file_search", "actions", "tools"]
   custom:
+    # AIPass Example
+    # AIPass uses the user's OAuth token for authentication (no static API key needed)
+    # Users must log in with AIPass OAuth to use this endpoint
+    # - name: 'AIPass'
+    #   apiKey: 'aipass_oauth'  # Special marker: uses user's AIPass OAuth token
+    #   baseURL: 'https://aipass.one/oauth2/v1'
+    #   models:
+    #     default:
+    #       - 'gpt-4o'
+    #       - 'gpt-4o-mini'
+    #       - 'claude-3-5-sonnet-20241022'
+    #     fetch: true
+    #   titleConvo: true
+    #   titleModel: 'gpt-4o-mini'
+    #   modelDisplayLabel: 'AIPass'
+
     # Groq Example
     - name: 'groq'
       apiKey: '${GROQ_API_KEY}'

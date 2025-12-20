@@ -130,6 +130,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       updateFilesUsage: db.updateFilesUsage,
       getUserKeyValues: db.getUserKeyValues,
       getToolFilesByIds: db.getToolFilesByIds,
+      getAIPassToken: db.getAIPassToken,
     },
   );
 
@@ -172,6 +173,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
         updateFilesUsage: db.updateFilesUsage,
         getUserKeyValues: db.getUserKeyValues,
         getToolFilesByIds: db.getToolFilesByIds,
+        getAIPassToken: db.getAIPassToken,
       },
     );
     if (userMCPAuthMap != null) {

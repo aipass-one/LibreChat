@@ -1,10 +1,14 @@
-const { isUserProvided, fetchModels } = require('@librechat/api');
+const { isUserProvided, fetchModels, logger } = require('@librechat/api');
 const {
   EModelEndpoint,
   extractEnvVariable,
   normalizeEndpointName,
 } = require('librechat-data-provider');
 const { getAppConfig } = require('./app');
+const { getAIPassToken } = require('~/models');
+
+// Special marker for AIPass OAuth-based authentication
+const AIPASS_OAUTH_MARKER = 'aipass_oauth';
 
 /**
  * Load config endpoints from the cached configuration object
@@ -66,6 +70,38 @@ async function loadConfigModels(req) {
     const uniqueKey = `${BASE_URL}__${API_KEY}`;
 
     modelsConfig[name] = [];
+
+    // Special handling for AIPass OAuth-based authentication
+    if (models.fetch && apiKey === AIPASS_OAUTH_MARKER) {
+      // Get user's AIPass OAuth token
+      const aipassToken = req.user?.id ? await getAIPassToken({ userId: req.user.id }) : null;
+      if (aipassToken) {
+        const aipassUniqueKey = `${BASE_URL}__aipass_${req.user.id}`;
+        fetchPromisesMap[aipassUniqueKey] =
+          fetchPromisesMap[aipassUniqueKey] ||
+          fetchModels({
+            name,
+            apiKey: aipassToken,
+            baseURL: BASE_URL,
+            user: req.user.id,
+            userObject: req.user,
+            headers: endpointHeaders || {},
+            direct: endpoint.directEndpoint,
+            userIdQuery: models.userIdQuery,
+          });
+        uniqueKeyToEndpointsMap[aipassUniqueKey] = uniqueKeyToEndpointsMap[aipassUniqueKey] || [];
+        uniqueKeyToEndpointsMap[aipassUniqueKey].push(name);
+        continue;
+      } else {
+        // No AIPass token available, use default models
+        if (Array.isArray(models.default)) {
+          modelsConfig[name] = models.default.map((model) =>
+            typeof model === 'string' ? model : model.name,
+          );
+        }
+        continue;
+      }
+    }
 
     if (models.fetch && !isUserProvided(API_KEY) && !isUserProvided(BASE_URL)) {
       fetchPromisesMap[uniqueKey] =

@@ -106,6 +106,19 @@ const userSchema = new Schema<IUser>(
       unique: true,
       sparse: true,
     },
+    aipassId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    aipassTokens: {
+      type: {
+        accessToken: String,
+        refreshToken: String,
+        expiresAt: Date,
+      },
+      select: false,
+    },
     plugins: {
       type: Array,
     },

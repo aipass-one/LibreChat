@@ -56,6 +56,8 @@ router.get('/', async function (req, res) {
       !!process.env.SAML_CERT &&
       !!process.env.SAML_SESSION_SECRET;
 
+    const isAIPassEnabled = !!process.env.AIPASS_CLIENT_ID;
+
     const balanceConfig = getBalanceConfig(appConfig);
 
     /** @type {TStartupConfig} */
@@ -79,6 +81,10 @@ router.get('/', async function (req, res) {
       samlLoginEnabled: !isOpenIdEnabled && isSamlEnabled,
       samlLabel: process.env.SAML_BUTTON_LABEL,
       samlImageUrl: process.env.SAML_IMAGE_URL,
+      aipassLoginEnabled: isAIPassEnabled,
+      aipassLabel: process.env.AIPASS_BUTTON_LABEL || 'Continue with AIPass',
+      aipassImageUrl: process.env.AIPASS_IMAGE_URL,
+      aipassAutoRedirect: isEnabled(process.env.AIPASS_AUTO_REDIRECT),
       serverDomain: process.env.DOMAIN_SERVER || 'http://localhost:3080',
       emailLoginEnabled,
       registrationEnabled: !ldap?.enabled && isEnabled(process.env.ALLOW_REGISTRATION),

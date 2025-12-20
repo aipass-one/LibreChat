@@ -1,4 +1,5 @@
 import {
+  AuthType,
   CacheKeys,
   ErrorTypes,
   envVarRegex,
@@ -13,6 +14,11 @@ import { getCustomEndpointConfig } from '~/app/config';
 import { fetchModels } from '~/endpoints/models';
 import { isUserProvided, checkUserKeyExpiry } from '~/utils';
 import { standardCache } from '~/cache';
+
+/**
+ * Checks if the provided value is 'aipass_oauth'.
+ */
+const isAIPassOAuth = (value?: string): boolean => value === AuthType.AIPASS_OAUTH;
 
 const { PROXY } = process.env;
 
@@ -90,6 +96,7 @@ export async function initializeCustom({
 
   const userProvidesKey = isUserProvided(CUSTOM_API_KEY);
   const userProvidesURL = isUserProvided(CUSTOM_BASE_URL);
+  const usesAIPassOAuth = isAIPassOAuth(CUSTOM_API_KEY);
 
   let userValues = null;
   if (expiresAt && (userProvidesKey || userProvidesURL)) {
@@ -97,7 +104,26 @@ export async function initializeCustom({
     userValues = await db.getUserKeyValues({ userId: req.user?.id ?? '', name: endpoint });
   }
 
-  const apiKey = userProvidesKey ? userValues?.apiKey : CUSTOM_API_KEY;
+  let apiKey: string | undefined | null;
+
+  // Handle AIPass OAuth - get token from user's stored OAuth credentials
+  if (usesAIPassOAuth) {
+    if (!db.getAIPassToken) {
+      throw new Error(`AIPass OAuth is configured for ${endpoint} but getAIPassToken method is not available.`);
+    }
+    apiKey = await db.getAIPassToken({ userId: req.user?.id ?? '' });
+    if (!apiKey) {
+      throw new Error(
+        JSON.stringify({
+          type: ErrorTypes.NO_USER_KEY,
+          message: 'AIPass authentication required. Please log in with AIPass.',
+        }),
+      );
+    }
+  } else {
+    apiKey = userProvidesKey ? userValues?.apiKey : CUSTOM_API_KEY;
+  }
+
   const baseURL = userProvidesURL ? userValues?.baseURL : CUSTOM_BASE_URL;
 
   if (userProvidesKey && !apiKey) {
