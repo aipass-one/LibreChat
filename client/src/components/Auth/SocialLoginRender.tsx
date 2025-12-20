@@ -122,13 +122,7 @@ function SocialLoginRender({
         enabled={startupConfig.aipassLoginEnabled}
         serverDomain={startupConfig.serverDomain}
         oauthPath="aipass"
-        Icon={() =>
-          startupConfig.aipassImageUrl ? (
-            <img src={startupConfig.aipassImageUrl} alt="AIPass Logo" className="h-5 w-5" />
-          ) : (
-            <AIPassIcon />
-          )
-        }
+        Icon={() => <AIPassIcon />}
         label={startupConfig.aipassLabel}
         id="aipass"
       />

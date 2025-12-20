@@ -74,7 +74,7 @@ function Login() {
   // Render fallback UI if auto-redirect is active.
   if (shouldAutoRedirect) {
     const label = shouldAutoRedirectToAIPass ? startupConfig.aipassLabel : startupConfig.openidLabel;
-    const imageUrl = shouldAutoRedirectToAIPass ? startupConfig.aipassImageUrl : startupConfig.openidImageUrl;
+    const imageUrl = shouldAutoRedirectToAIPass ? undefined : startupConfig.openidImageUrl;
     const Icon = shouldAutoRedirectToAIPass ? AIPassIcon : OpenIDIcon;
 
     return (

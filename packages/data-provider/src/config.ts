@@ -650,7 +650,6 @@ export type TStartupConfig = {
   samlLabel: string;
   samlImageUrl: string;
   aipassLabel: string;
-  aipassImageUrl?: string;
   aipassAutoRedirect: boolean;
   /** LDAP Auth Configuration */
   ldap?: {
@@ -1343,10 +1342,6 @@ export enum CacheKeys {
    * Key for SAML session.
    */
   SAML_SESSION = 'SAML_SESSION',
-  /**
-   * Key for AIPass session.
-   */
-  AIPASS_SESSION = 'AIPASS_SESSION',
 }
 
 /**
