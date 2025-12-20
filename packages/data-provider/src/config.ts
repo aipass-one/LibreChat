@@ -1384,7 +1384,6 @@ export type TStartupConfig = {
   samlLabel: string;
   samlImageUrl: string;
   aipassLabel: string;
-  aipassImageUrl?: string;
   aipassAutoRedirect: boolean;
   /** LDAP Auth Configuration */
   ldap?: {
