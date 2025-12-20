@@ -6,6 +6,7 @@ import {
   DiscordIcon,
   AppleIcon,
   SamlIcon,
+  AIPassIcon,
 } from '@librechat/client';
 
 import SocialButton from './SocialButton';
@@ -113,6 +114,23 @@ function SocialLoginRender({
         }
         label={startupConfig.samlLabel ? startupConfig.samlLabel : localize('com_auth_saml_login')}
         id="saml"
+      />
+    ),
+    aipass: startupConfig.aipassLoginEnabled && (
+      <SocialButton
+        key="aipass"
+        enabled={startupConfig.aipassLoginEnabled}
+        serverDomain={startupConfig.serverDomain}
+        oauthPath="aipass"
+        Icon={() =>
+          startupConfig.aipassImageUrl ? (
+            <img src={startupConfig.aipassImageUrl} alt="AIPass Logo" className="h-5 w-5" />
+          ) : (
+            <AIPassIcon />
+          )
+        }
+        label={startupConfig.aipassLabel}
+        id="aipass"
       />
     ),
   };

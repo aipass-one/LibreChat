@@ -14,6 +14,7 @@ const {
 const { checkDomainAllowed, loginLimiter, logHeaders } = require('~/server/middleware');
 const { createOAuthHandler } = require('~/server/controllers/auth/oauth');
 const { findBalanceByUser, upsertBalanceFields } = require('~/models');
+const { aipassOauthHandler } = require('~/server/services/AIPass');
 const { getAppConfig } = require('~/server/services/Config');
 
 const setBalanceConfig = createSetBalanceConfig({
@@ -215,6 +216,28 @@ router.post(
     failureMessage: true,
     session: false,
   }),
+  oauthHandler,
+);
+
+/**
+ * AIPass Routes
+ */
+router.get('/aipass', (req, res, next) => {
+  return passport.authenticate('aipass', {
+    session: false,
+  })(req, res, next);
+});
+
+router.get(
+  '/aipass/callback',
+  passport.authenticate('aipass', {
+    failureRedirect: `${domains.client}/oauth/error`,
+    failureMessage: true,
+    session: false,
+  }),
+  setBalanceConfig,
+  checkDomainAllowed,
+  aipassOauthHandler,
   oauthHandler,
 );
 

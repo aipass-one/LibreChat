@@ -34,6 +34,7 @@ const namespaces = {
 
   [CacheKeys.OPENID_SESSION]: sessionCache(CacheKeys.OPENID_SESSION),
   [CacheKeys.SAML_SESSION]: sessionCache(CacheKeys.SAML_SESSION),
+  ['AIPASS_SESSION']: sessionCache('AIPASS_SESSION'),
 
   [CacheKeys.ROLES]: standardCache(CacheKeys.ROLES),
   [CacheKeys.APP_CONFIG]: standardCache(CacheKeys.APP_CONFIG),

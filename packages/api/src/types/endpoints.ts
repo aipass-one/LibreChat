@@ -26,6 +26,11 @@ export type GetUserKeyValuesFunction = (params: {
 }) => Promise<UserKeyValues>;
 
 /**
+ * Function type for getting AIPass OAuth token
+ */
+export type GetAIPassTokenFunction = (params: { userId: string }) => Promise<string | null>;
+
+/**
  * Database methods required for endpoint initialization
  * These are passed in at invocation time to allow for dependency injection
  */
@@ -34,6 +39,8 @@ export interface EndpointDbMethods {
   getUserKey: GetUserKeyFunction;
   /** Get parsed key values object (used for apiKey + baseURL combinations) */
   getUserKeyValues: GetUserKeyValuesFunction;
+  /** Get AIPass OAuth access token for the user (optional, only needed for AIPass endpoints) */
+  getAIPassToken?: GetAIPassTokenFunction;
 }
 
 /**

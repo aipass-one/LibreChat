@@ -726,6 +726,7 @@ class AgentClient extends BaseClient {
         getToolFilesByIds: db.getToolFilesByIds,
         getCodeGeneratedFiles: db.getCodeGeneratedFiles,
         filterFilesByAgentAccess,
+        getAIPassToken: db.getAIPassToken,
       },
     );
 
@@ -1688,6 +1689,7 @@ class AgentClient extends BaseClient {
       db: {
         getUserKey: db.getUserKey,
         getUserKeyValues: db.getUserKeyValues,
+        getAIPassToken: db.getAIPassToken,
       },
     });
 

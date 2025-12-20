@@ -236,7 +236,7 @@ interface:
 
 # Example Registration Object Structure (optional)
 registration:
-  socialLogins: ['github', 'google', 'discord', 'openid', 'facebook', 'apple', 'saml']
+  socialLogins: ['github', 'google', 'discord', 'openid', 'facebook', 'apple', 'saml', 'aipass']
   # allowedDomains:
   # - "gmail.com"
 
@@ -518,6 +518,19 @@ endpoints:
   #     #     deploymentName: claude-3-5-haiku@20241022  # Override for this model
 
   custom:
+    # AIPass Example
+    # Uses the signed-in user's AIPass OAuth token and discovers only chat models.
+    # - name: 'AIPass'
+    #   apiKey: 'aipass_oauth'
+    #   baseURL: 'https://aipass.one/oauth2/v1'
+    #   models:
+    #     fetch: true
+    #     queryParams:
+    #       type: 'text'
+    #       method: 'chat_completions'
+    #   titleConvo: true
+    #   modelDisplayLabel: 'AIPass'
+
     # Anthropic-compatible Example (native `/v1/messages` API)
     # Set `provider: anthropic` to use the native Anthropic client instead of the
     # default OpenAI-compatible one — for Anthropic itself or Anthropic-compatible

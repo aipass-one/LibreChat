@@ -1,5 +1,6 @@
 import { Providers } from '@librechat/agents';
 import {
+  AuthType,
   ErrorTypes,
   envVarRegex,
   EModelEndpoint,
@@ -23,6 +24,11 @@ import { getCustomEndpointConfig } from '~/app/config';
 import { fetchModels } from '~/endpoints/models';
 import { validateEndpointURL } from '~/auth';
 import { tokenConfigCache } from '~/cache';
+
+/**
+ * Checks if the provided value is 'aipass_oauth'.
+ */
+const isAIPassOAuth = (value?: string): boolean => value === AuthType.AIPASS_OAUTH;
 
 const { PROXY } = process.env;
 
@@ -52,10 +58,11 @@ export function getTokenConfigKey(
 
   const userProvidesKey = isUserProvided(extractEnvVariable(endpointConfig.apiKey ?? ''));
   const userProvidesURL = isUserProvided(extractEnvVariable(endpointConfig.baseURL ?? ''));
+  const usesAIPassOAuth = isAIPassOAuth(extractEnvVariable(endpointConfig.apiKey ?? ''));
   const willForwardUserScopedHeaders = !!endpointConfig?.headers && !userProvidesURL;
   const tenantScope = getTenantTokenScope(tenantId);
 
-  if (userProvidesKey || userProvidesURL || willForwardUserScopedHeaders) {
+  if (userProvidesKey || userProvidesURL || usesAIPassOAuth || willForwardUserScopedHeaders) {
     return tenantScope
       ? getScopedTokenConfigKey('tenant-user', [tenantScope, endpoint, userId])
       : `${endpoint}:${userId}`;
@@ -204,6 +211,7 @@ export async function initializeCustom({
 
   const userProvidesKey = isUserProvided(CUSTOM_API_KEY);
   const userProvidesURL = isUserProvided(CUSTOM_BASE_URL);
+  const usesAIPassOAuth = isAIPassOAuth(CUSTOM_API_KEY);
 
   // Expiry is only checked when present: the Agents API sends an OpenAI-compatible
   // request body that does not include `key` (the expiry timestamp), so expiresAt
@@ -217,7 +225,25 @@ export async function initializeCustom({
     userValues = await db.getUserKeyValues({ userId: req.user?.id ?? '', name: endpoint });
   }
 
-  const apiKey = userProvidesKey || userProvidesURL ? userValues?.apiKey : CUSTOM_API_KEY;
+  let apiKey: string | undefined | null;
+
+  // Handle AIPass OAuth - get token from user's stored OAuth credentials
+  if (usesAIPassOAuth) {
+    if (!db.getAIPassToken) {
+      throw new Error(`AIPass OAuth is configured for ${endpoint} but getAIPassToken method is not available.`);
+    }
+    apiKey = await db.getAIPassToken({ userId: req.user?.id ?? '' });
+    if (!apiKey) {
+      throw new Error(
+        JSON.stringify({
+          type: ErrorTypes.NO_USER_KEY,
+          message: 'AIPass authentication required. Please log in with AIPass.',
+        }),
+      );
+    }
+  } else {
+    apiKey = userProvidesKey || userProvidesURL ? userValues?.apiKey : CUSTOM_API_KEY;
+  }
   const baseURL = userProvidesURL ? userValues?.baseURL : CUSTOM_BASE_URL;
 
   if ((userProvidesKey || userProvidesURL) && !apiKey) {
@@ -292,6 +318,7 @@ export async function initializeCustom({
       // templates like {{LIBRECHAT_OPENID_ID_TOKEN}} would otherwise resolve
       // and leak the user's identity token to a destination the user controls.
       headers: userProvidesURL ? undefined : endpointConfig.headers,
+      queryParams: endpointConfig.models?.queryParams,
       // Note: when both `headers` and `userObject` are supplied below, the
       // MODEL_QUERIES cache inside `fetchModels` is automatically skipped,
       // which prevents a per-user filtered model list from leaking across

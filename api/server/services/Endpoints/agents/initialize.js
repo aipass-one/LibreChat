@@ -401,6 +401,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       listSkillsByAccess: skillDbMethods.listSkillsByAccess,
       listAlwaysApplySkills: skillDbMethods.listAlwaysApplySkills,
       getSkillByName: skillDbMethods.getSkillByName,
+      getAIPassToken: db.getAIPassToken,
     },
   );
 
@@ -477,6 +478,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
         listSkillsByAccess: skillDbMethods.listSkillsByAccess,
         listAlwaysApplySkills: skillDbMethods.listAlwaysApplySkills,
         getSkillByName: skillDbMethods.getSkillByName,
+        getAIPassToken: db.getAIPassToken,
       },
       // The callback fires during BFS, before the helper prunes agents
       // whose edges end up filtered. Don't populate `agentConfigs` here —
@@ -684,6 +686,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
           listSkillsByAccess: skillDbMethods.listSkillsByAccess,
           listAlwaysApplySkills: skillDbMethods.listAlwaysApplySkills,
           getSkillByName: skillDbMethods.getSkillByName,
+          getAIPassToken: db.getAIPassToken,
         },
       );
       agentConfigs.set(agentId, config);

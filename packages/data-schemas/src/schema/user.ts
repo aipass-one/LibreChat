@@ -92,6 +92,19 @@ const userSchema: Schema<IUser> = new Schema<IUser>(
     appleId: {
       type: String,
     },
+    aipassId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    aipassTokens: {
+      type: {
+        accessToken: String,
+        refreshToken: String,
+        expiresAt: Date,
+      },
+      select: false,
+    },
     plugins: {
       type: Array,
     },
