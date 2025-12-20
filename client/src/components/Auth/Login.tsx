@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ErrorTypes, registerPage } from 'librechat-data-provider';
-import { OpenIDIcon, useToastContext } from '@librechat/client';
+import { OpenIDIcon, AIPassIcon, useToastContext } from '@librechat/client';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { TLoginLayoutContext } from '~/common';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
@@ -46,42 +46,57 @@ function Login() {
     }
   }, [disableAutoRedirect, searchParams, setSearchParams]);
 
-  // Determine whether we should auto-redirect to OpenID.
-  const shouldAutoRedirect =
+  // Determine whether we should auto-redirect to OpenID or AIPass.
+  const shouldAutoRedirectToOpenID =
     startupConfig?.openidLoginEnabled &&
     startupConfig?.openidAutoRedirect &&
     startupConfig?.serverDomain &&
     !isAutoRedirectDisabled;
 
+  const shouldAutoRedirectToAIPass =
+    startupConfig?.aipassLoginEnabled &&
+    startupConfig?.aipassAutoRedirect &&
+    startupConfig?.serverDomain &&
+    !isAutoRedirectDisabled;
+
+  // AIPass takes priority if both are enabled with auto-redirect
+  const shouldAutoRedirect = shouldAutoRedirectToAIPass || shouldAutoRedirectToOpenID;
+  const autoRedirectProvider = shouldAutoRedirectToAIPass ? 'aipass' : 'openid';
+
   useEffect(() => {
     if (shouldAutoRedirect) {
-      console.log('Auto-redirecting to OpenID provider...');
-      window.location.href = `${startupConfig.serverDomain}/oauth/openid`;
+      const provider = shouldAutoRedirectToAIPass ? 'aipass' : 'openid';
+      console.log(`Auto-redirecting to ${provider} provider...`);
+      window.location.href = `${startupConfig.serverDomain}/oauth/${provider}`;
     }
-  }, [shouldAutoRedirect, startupConfig]);
+  }, [shouldAutoRedirect, shouldAutoRedirectToAIPass, startupConfig]);
 
   // Render fallback UI if auto-redirect is active.
   if (shouldAutoRedirect) {
+    const label = shouldAutoRedirectToAIPass ? startupConfig.aipassLabel : startupConfig.openidLabel;
+    const imageUrl = shouldAutoRedirectToAIPass ? undefined : startupConfig.openidImageUrl;
+    const Icon = shouldAutoRedirectToAIPass ? AIPassIcon : OpenIDIcon;
+
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <p className="text-lg font-semibold">
-          {localize('com_ui_redirecting_to_provider', { 0: startupConfig.openidLabel })}
+          {localize('com_ui_redirecting_to_provider', { 0: label })}
         </p>
         <div className="mt-4">
           <SocialButton
-            key="openid"
-            enabled={startupConfig.openidLoginEnabled}
+            key={autoRedirectProvider}
+            enabled={true}
             serverDomain={startupConfig.serverDomain}
-            oauthPath="openid"
+            oauthPath={autoRedirectProvider}
             Icon={() =>
-              startupConfig.openidImageUrl ? (
-                <img src={startupConfig.openidImageUrl} alt="OpenID Logo" className="h-5 w-5" />
+              imageUrl ? (
+                <img src={imageUrl} alt={`${label} Logo`} className="h-5 w-5" />
               ) : (
-                <OpenIDIcon />
+                <Icon />
               )
             }
-            label={startupConfig.openidLabel}
-            id="openid"
+            label={label}
+            id={autoRedirectProvider}
           />
         </div>
       </div>

@@ -8,6 +8,7 @@ const { isEnabled, createSetBalanceConfig } = require('@librechat/api');
 const { checkDomainAllowed, loginLimiter, logHeaders, checkBan } = require('~/server/middleware');
 const { syncUserEntraGroupMemberships } = require('~/server/services/PermissionService');
 const { setAuthTokens, setOpenIDAuthTokens } = require('~/server/services/AuthService');
+const { aipassOauthHandler } = require('~/server/services/AIPass');
 const { getAppConfig } = require('~/server/services/Config');
 const { Balance } = require('~/db/models');
 
@@ -223,6 +224,27 @@ router.post(
     session: false,
   }),
   oauthHandler,
+);
+
+/**
+ * AIPass Routes
+ */
+router.get('/aipass', (req, res, next) => {
+  return passport.authenticate('aipass', {
+    session: false,
+  })(req, res, next);
+});
+
+router.get(
+  '/aipass/callback',
+  passport.authenticate('aipass', {
+    failureRedirect: `${domains.client}/oauth/error`,
+    failureMessage: true,
+    session: false,
+  }),
+  setBalanceConfig,
+  checkDomainAllowed,
+  aipassOauthHandler,
 );
 
 module.exports = router;

@@ -18,6 +18,12 @@ export interface IUser extends Document {
   githubId?: string;
   discordId?: string;
   appleId?: string;
+  aipassId?: string;
+  aipassTokens?: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+  };
   plugins?: string[];
   twoFactorEnabled?: boolean;
   totpSecret?: string;
@@ -95,6 +101,7 @@ export interface UserFilterOptions extends CursorPaginationParams {
   githubId?: string;
   discordId?: string;
   appleId?: string;
+  aipassId?: string;
   // Date filters
   createdAfter?: string;
   createdBefore?: string;

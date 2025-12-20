@@ -8,7 +8,7 @@ import { apiBaseUrl } from './api-endpoints';
 import { FileSources } from './types/files';
 import { MCPServersSchema } from './mcp';
 
-export const defaultSocialLogins = ['google', 'facebook', 'openid', 'github', 'discord', 'saml'];
+export const defaultSocialLogins = ['google', 'facebook', 'openid', 'github', 'discord', 'saml', 'aipass'];
 
 export const defaultRetrievalModels = [
   'gpt-4o',
@@ -643,11 +643,14 @@ export type TStartupConfig = {
   openidLoginEnabled: boolean;
   appleLoginEnabled: boolean;
   samlLoginEnabled: boolean;
+  aipassLoginEnabled: boolean;
   openidLabel: string;
   openidImageUrl: string;
   openidAutoRedirect: boolean;
   samlLabel: string;
   samlImageUrl: string;
+  aipassLabel: string;
+  aipassAutoRedirect: boolean;
   /** LDAP Auth Configuration */
   ldap?: {
     /** LDAP enabled */
