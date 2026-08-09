@@ -7,11 +7,12 @@ import {
   renderEndpoints,
   renderSearchResults,
   renderCustomGroups,
+  renderEndpointModels,
 } from './components';
 import { ModelSelectorProvider, useModelSelectorContext } from './ModelSelectorContext';
 import { useShortcutAriaKey, useShortcutHint } from '~/hooks/useKeyboardShortcuts';
 import { ModelSelectorChatProvider } from './ModelSelectorChatContext';
-import { getSelectedIcon, getDisplayValue } from './utils';
+import { filterModels, getDirectModelEndpoint, getSelectedIcon, getDisplayValue } from './utils';
 import { CustomMenu as Menu } from './CustomMenu';
 import DialogManager from './DialogManager';
 import { useLocalize } from '~/hooks';
@@ -29,6 +30,7 @@ function ModelSelectorContent() {
     modelSpecs,
     mappedEndpoints,
     endpointsConfig,
+    endpointRequiresUserKey,
     // State
     searchValue,
     searchResults,
@@ -41,6 +43,23 @@ function ModelSelectorContent() {
     onOpenChange,
     keyDialogEndpoint,
   } = useModelSelectorContext();
+
+  const directModelEndpoint = useMemo(
+    () => getDirectModelEndpoint(mappedEndpoints, modelSpecs, endpointRequiresUserKey),
+    [mappedEndpoints, modelSpecs, endpointRequiresUserKey],
+  );
+  const directModels = useMemo(() => {
+    if (!directModelEndpoint?.models) {
+      return null;
+    }
+
+    const models = directModelEndpoint.models.map((model) => model.name);
+    if (!searchValue) {
+      return models;
+    }
+
+    return filterModels(directModelEndpoint, models, searchValue, agentsMap, undefined);
+  }, [agentsMap, directModelEndpoint, searchValue]);
 
   const selectedIcon = useMemo(
     () =>
@@ -86,6 +105,31 @@ function ModelSelectorContent() {
     />
   );
 
+  let menuContent: React.ReactNode;
+  if (directModelEndpoint && directModels) {
+    menuContent =
+      directModels.length > 0 ? (
+        renderEndpointModels(directModelEndpoint, directModelEndpoint.models ?? [], directModels, 0)
+      ) : (
+        <div role="alert" aria-live="polite" className="cursor-default p-2 sm:py-1 sm:text-sm">
+          {localize('com_files_no_results')}
+        </div>
+      );
+  } else if (searchResults) {
+    menuContent = renderSearchResults(searchResults, localize, searchValue);
+  } else {
+    menuContent = (
+      <>
+        {renderModelSpecs(
+          modelSpecs?.filter((spec) => !spec.group) || [],
+          selectedValues.modelSpec || '',
+        )}
+        {renderEndpoints(mappedEndpoints ?? [])}
+        {renderCustomGroups(modelSpecs || [], mappedEndpoints ?? [])}
+      </>
+    );
+  }
+
   return (
     <div className="relative flex w-full max-w-md flex-col items-center gap-2">
       <Menu
@@ -99,24 +143,14 @@ function ModelSelectorContent() {
         }}
         onSearch={(value) => setSearchValue(value)}
         combobox={<input id="model-search" placeholder=" " />}
-        comboboxLabel={localize('com_endpoint_search_models')}
+        comboboxLabel={
+          directModelEndpoint
+            ? localize('com_endpoint_search_endpoint_models', { 0: directModelEndpoint.label })
+            : localize('com_endpoint_search_models')
+        }
         trigger={trigger}
       >
-        {searchResults ? (
-          renderSearchResults(searchResults, localize, searchValue)
-        ) : (
-          <>
-            {/* Render ungrouped modelSpecs (no group field) */}
-            {renderModelSpecs(
-              modelSpecs?.filter((spec) => !spec.group) || [],
-              selectedValues.modelSpec || '',
-            )}
-            {/* Render endpoints (will include grouped specs matching endpoint names) */}
-            {renderEndpoints(mappedEndpoints ?? [])}
-            {/* Render custom groups (specs with group field not matching any endpoint) */}
-            {renderCustomGroups(modelSpecs || [], mappedEndpoints ?? [])}
-          </>
-        )}
+        {menuContent}
       </Menu>
       <DialogManager
         keyDialogOpen={keyDialogOpen}
