@@ -15,6 +15,18 @@ GET /v1/models?type=text&method=chat_completions
 The canonical `/v1` API identifies the Bearer credential as an OAuth token or an API key. LibreChat
 sends the signed-in user's OAuth token; no compatibility client-id header is required.
 
+Keep the AI Pass endpoint's `models.fetch` setting enabled and avoid pinning the same models in
+`modelSpecs`. Model specs are static shortcuts; leaving an old curated list there makes removed
+models look current and hides new catalog entries behind an extra selector level. A short
+`models.default` list may remain only as a temporary fallback when discovery is unavailable.
+
+## Remaining balance
+
+The account menu shows the user's authoritative remaining AI Pass balance. LibreChat obtains it
+server-side from `GET /api/v1/usage/me/summary` with the user's encrypted OAuth credential and
+returns only the normalized USD amounts to the browser. The OAuth access token is never exposed.
+The value refreshes on window focus, reconnect, and every 30 seconds while chat is open.
+
 ## Image generation and editing
 
 `AI Pass Image Studio` is enabled by default in the Docker configurations. Add it to a LibreChat

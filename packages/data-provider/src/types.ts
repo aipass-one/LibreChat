@@ -768,6 +768,13 @@ export type TBalanceResponse = {
   refillAmount?: number;
 };
 
+export type TAIPassBalanceResponse = {
+  remainingBudget: number;
+  totalCost: number | null;
+  maxBudget: number | null;
+  currency: 'USD';
+};
+
 /* -------------------------------------------------------------------------- */
 /* Skill UI extensions (not yet persisted — phase 2 backend will fill these)  */
 /* -------------------------------------------------------------------------- */

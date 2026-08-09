@@ -12,6 +12,7 @@ export enum QueryKeys {
   name = 'name', // user key name
   models = 'models',
   balance = 'balance',
+  aipassBalance = 'aipassBalance',
   endpoints = 'endpoints',
   tokenConfig = 'tokenConfig',
   contextProjection = 'contextProjection',
