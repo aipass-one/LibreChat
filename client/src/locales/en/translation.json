@@ -1886,6 +1886,8 @@
   "com_ui_web_search_firecrawl_url": "Firecrawl API URL (optional)",
   "com_ui_web_search_jina_key": "Enter Jina API Key",
   "com_ui_web_search_jina_url": "Jina API URL (optional)",
+  "com_ui_web_search_native_price": "{{0}}/query",
+  "com_ui_web_search_native_price_help": "Google Search grounding price; a prompt may use multiple queries",
   "com_ui_web_search_processing": "Processing results",
   "com_ui_web_search_provider": "Search Provider",
   "com_ui_web_search_provider_searxng": "SearXNG",

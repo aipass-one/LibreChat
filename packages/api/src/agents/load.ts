@@ -1,23 +1,28 @@
-import { logger } from '@librechat/data-schemas';
 import {
   Tools,
   Constants,
   isAgentsEndpoint,
   isEphemeralAgentId,
   encodeEphemeralAgentId,
+  getNativeWebSearchConfig,
+  normalizeEndpointName,
 } from 'librechat-data-provider';
 import type {
   AgentModelParameters,
   TEphemeralAgent,
   TModelSpec,
+  TConfig,
   Agent,
 } from 'librechat-data-provider';
 import type { AppConfig } from '@librechat/data-schemas';
 import { requiresEphemeralUserConnection } from '~/mcp/utils';
-import { getCustomEndpointConfig } from '~/app/config';
 
 const { mcp_all, mcp_delimiter } = Constants;
 type ModelParametersWithPromptPrefix = AgentModelParameters & { promptPrefix?: string | null };
+type NativeEndpointConfig = {
+  customParams?: TConfig['customParams'];
+  modelDisplayLabel?: string;
+};
 
 export interface LoadAgentDeps {
   getAgent: (searchParameter: { id: string }) => Promise<Agent | null>;
@@ -55,6 +60,20 @@ export async function loadEphemeralAgent(
   if (spec != null && spec !== '') {
     modelSpec = modelSpecs?.list?.find((s) => s.name === spec) ?? null;
   }
+
+  const appConfig = req.config;
+  const endpoints = appConfig?.endpoints;
+  const directEndpointConfig = endpoints?.[endpoint as keyof typeof endpoints];
+  let endpointConfig = Array.isArray(directEndpointConfig)
+    ? undefined
+    : (directEndpointConfig as NativeEndpointConfig | undefined);
+  if (!isAgentsEndpoint(endpoint) && !endpointConfig && Array.isArray(endpoints?.custom)) {
+    const normalizedEndpoint = normalizeEndpointName(endpoint);
+    endpointConfig = endpoints.custom.find(
+      (candidate) => normalizeEndpointName(candidate.name) === normalizedEndpoint,
+    );
+  }
+
   const ephemeralAgent: TEphemeralAgent | undefined = req.body?.ephemeralAgent;
   const mcpServers = new Set<string>(ephemeralAgent?.mcp);
   const userId = req.user?.id ?? '';
@@ -70,7 +89,10 @@ export async function loadEphemeralAgent(
   if (ephemeralAgent?.file_search === true || modelSpec?.fileSearch === true) {
     tools.push(Tools.file_search);
   }
-  if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
+  const webSearchSelected = ephemeralAgent?.web_search === true || modelSpec?.webSearch === true;
+  const nativeWebSearch = getNativeWebSearchConfig(endpointConfig?.customParams, model as string);
+  const endpointUsesNativeWebSearch = endpointConfig?.customParams?.nativeWebSearch != null;
+  if (webSearchSelected && !endpointUsesNativeWebSearch) {
     tools.push(Tools.web_search);
   }
 
@@ -100,21 +122,14 @@ export async function loadEphemeralAgent(
   const requestPromptPrefix = req.body?.promptPrefix;
   const { promptPrefix: modelPromptPrefix, ...safeModelParameters } =
     model_parameters as ModelParametersWithPromptPrefix;
+  if (webSearchSelected && nativeWebSearch) {
+    (safeModelParameters as ModelParametersWithPromptPrefix & { web_search?: boolean }).web_search =
+      true;
+  }
   const instructions =
     typeof modelPromptPrefix === 'string' ? modelPromptPrefix : requestPromptPrefix;
 
   // Get endpoint config for modelDisplayLabel fallback
-  const appConfig = req.config;
-  const endpoints = appConfig?.endpoints;
-  let endpointConfig = endpoints?.[endpoint as keyof typeof endpoints];
-  if (!isAgentsEndpoint(endpoint) && !endpointConfig) {
-    try {
-      endpointConfig = getCustomEndpointConfig({ endpoint, appConfig });
-    } catch (err) {
-      logger.error('[loadEphemeralAgent] Error getting custom endpoint config', err);
-    }
-  }
-
   // For ephemeral agents, use modelLabel if provided, then model spec's label,
   // then modelDisplayLabel from endpoint config, otherwise empty string to show model name
   const sender =

@@ -1,3 +1,4 @@
+import { getNativeWebSearchConfig } from './types';
 import type { TEndpointsConfig } from './types';
 import { EModelEndpoint, isDocumentSupportedProvider } from './schemas';
 import { getEndpointFileConfig, mergeFileConfig } from './file-config';
@@ -101,6 +102,39 @@ describe('custom endpoint model discovery', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('accepts native web search metadata and matches configured model prefixes', () => {
+    const result = configSchema.safeParse({
+      version: '1.3.13',
+      endpoints: {
+        custom: [
+          {
+            name: 'AIPass',
+            apiKey: 'aipass_oauth',
+            baseURL: 'https://aipass.one/v1',
+            models: { default: ['gemini-3.5-flash-lite'] },
+            customParams: {
+              nativeWebSearch: {
+                modelPrefixes: ['gemini-'],
+                pricePerQuery: 0.014,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      return;
+    }
+    const config = result.data.endpoints?.custom?.[0].customParams;
+    expect(getNativeWebSearchConfig(config, 'gemini-3.6-flash')).toEqual({
+      modelPrefixes: ['gemini-'],
+      pricePerQuery: 0.014,
+    });
+    expect(getNativeWebSearchConfig(config, 'gpt-5.4-mini')).toBeNull();
   });
 });
 

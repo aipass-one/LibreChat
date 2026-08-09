@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { Globe } from 'lucide-react';
 import { CheckboxButton } from '@librechat/client';
 import { Permissions, PermissionTypes } from 'librechat-data-provider';
-import { useLocalize, useHasAccess } from '~/hooks';
+import { useLocalize, useHasAccess, useAgentCapabilities } from '~/hooks';
 import { useBadgeRowContext } from '~/Providers';
 
 function WebSearch() {
@@ -12,18 +12,25 @@ function WebSearch() {
     permission: Permissions.USE,
   });
   const context = useBadgeRowContext();
+  const { webSearchEnabled } = useAgentCapabilities(context?.agentsConfig?.capabilities);
   if (!canUseWebSearch) {
     return null;
   }
   if (!context) {
     return null;
   }
-  const { webSearch: webSearchData, searchApiKeyForm } = context;
+  const { webSearch: webSearchData, searchApiKeyForm, nativeWebSearch } = context;
+  const webSearchAvailable = nativeWebSearch.isManaged
+    ? nativeWebSearch.isAvailable
+    : webSearchEnabled;
+  if (!webSearchAvailable) {
+    return null;
+  }
   const { toggleState: webSearch, debouncedChange, isPinned, authData } = webSearchData;
   const { badgeTriggerRef } = searchApiKeyForm;
 
   return (
-    (isPinned || (webSearch && authData?.authenticated)) && (
+    (isPinned || (webSearch && (nativeWebSearch.isAvailable || authData?.authenticated))) && (
       <CheckboxButton
         ref={badgeTriggerRef}
         className="max-w-fit"

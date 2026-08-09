@@ -7,6 +7,7 @@ import {
   useSearchApiKeyForm,
   useGetAgentsConfig,
   useToolToggle,
+  useNativeWebSearch,
 } from '~/hooks';
 import { getTimestampedValue } from '~/utils/timestamps';
 import { useGetStartupConfig } from '~/data-provider';
@@ -18,6 +19,7 @@ interface BadgeRowContextType {
   agentsConfig?: TAgentsEndpoint | null;
   skills: ReturnType<typeof useToolToggle>;
   webSearch: ReturnType<typeof useToolToggle>;
+  nativeWebSearch: ReturnType<typeof useNativeWebSearch>;
   artifacts: ReturnType<typeof useToolToggle>;
   fileSearch: ReturnType<typeof useToolToggle>;
   codeInterpreter: ReturnType<typeof useToolToggle>;
@@ -48,6 +50,7 @@ export default function BadgeRowProvider({
   const hasInitializedRef = useRef(false);
   const { agentsConfig } = useGetAgentsConfig();
   const { data: startupConfig } = useGetStartupConfig();
+  const nativeWebSearch = useNativeWebSearch();
   const key = conversationId ?? Constants.NEW_CONVO;
   const hasModelSpecs = (startupConfig?.modelSpecs?.list?.length ?? 0) > 0;
 
@@ -217,10 +220,13 @@ export default function BadgeRowProvider({
     toolKey: Tools.web_search,
     localStorageKey: LocalStorageKeys.LAST_WEB_SEARCH_TOGGLE_,
     setIsDialogOpen: setWebSearchDialogOpen,
-    authConfig: {
-      toolId: Tools.web_search,
-      queryOptions: { retry: 1 },
-    },
+    isAuthenticated: nativeWebSearch.isAvailable ? true : undefined,
+    authConfig: nativeWebSearch.isManaged
+      ? undefined
+      : {
+          toolId: Tools.web_search,
+          queryOptions: { retry: 1 },
+        },
   });
 
   /** FileSearch hook */
@@ -255,6 +261,7 @@ export default function BadgeRowProvider({
   const value: BadgeRowContextType = {
     skills,
     webSearch,
+    nativeWebSearch,
     artifacts,
     fileSearch,
     agentsConfig,
