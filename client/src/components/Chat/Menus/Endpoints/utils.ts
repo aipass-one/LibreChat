@@ -88,6 +88,28 @@ export function shouldRenderEndpointOption(endpoint: {
   return !isAgentsEndpoint(endpoint.value) || endpoint.hasModels === true;
 }
 
+export function getDirectModelEndpoint(
+  mappedEndpoints: Endpoint[],
+  modelSpecs: TModelSpec[],
+  endpointRequiresUserKey: (endpoint: string) => boolean,
+): Endpoint | null {
+  if (mappedEndpoints.length !== 1 || modelSpecs.length > 0) {
+    return null;
+  }
+
+  const endpoint = mappedEndpoints[0];
+  if (
+    !endpoint.hasModels ||
+    !endpoint.models?.length ||
+    endpoint.showMarketplace === true ||
+    endpointRequiresUserKey(endpoint.value)
+  ) {
+    return null;
+  }
+
+  return endpoint;
+}
+
 export function filterModels(
   endpoint: Endpoint,
   models: string[],
