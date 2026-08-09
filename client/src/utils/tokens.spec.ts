@@ -396,6 +396,7 @@ describe('formatCost', () => {
 
   it('falls back to USD on a malformed currency code', () => {
     expect(formatCost(5, { code: 'invalid', rate: 1 })).toBe('$5.00');
+    expect(formatCost(5, { code: undefined as unknown as string, rate: 1 })).toBe('$5.00');
   });
 
   it('drops the rate too when the currency code is unsupported', () => {

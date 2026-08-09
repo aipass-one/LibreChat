@@ -18,6 +18,7 @@ import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
 import { useGetAIPassBalance, useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
+import { formatCost } from '~/utils';
 import Settings from './Settings';
 import store from '~/store';
 
@@ -153,12 +154,10 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
             <div className="mx-3 flex items-center justify-between gap-3 py-2 text-sm" role="note">
               <span className="text-text-secondary">{localize('com_nav_aipass_balance')}</span>
               <span className="font-medium tabular-nums text-text-primary">
-                {new Intl.NumberFormat(undefined, {
-                  style: 'currency',
-                  currency: aipassBalanceQuery.data.currency,
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 4,
-                }).format(aipassBalanceQuery.data.remainingBudget)}
+                {formatCost(aipassBalanceQuery.data.remainingBudget, {
+                  code: aipassBalanceQuery.data.currency ?? 'USD',
+                  rate: 1,
+                })}
               </span>
             </div>
             <DropdownMenuSeparator />
