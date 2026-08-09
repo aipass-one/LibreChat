@@ -348,6 +348,53 @@ describe('Tool Handlers', () => {
       expect(mockGetAIPassToken).toHaveBeenCalledWith({ userId: fakeUser._id.toString() });
     });
 
+    it('resolves delegated search from an ephemeral AI Pass endpoint after provider normalization', async () => {
+      const toolMap = await loadTools({
+        user: fakeUser._id.toString(),
+        agent: {
+          id: 'AIPass__claude-haiku-4-5___AIPass',
+          provider: 'openAI',
+          model: 'claude-haiku-4-5',
+        },
+        tools: ['web_search'],
+        returnMap: true,
+        options: {
+          req: {
+            user: { id: fakeUser._id.toString(), role: 'USER' },
+            body: { endpoint: 'agents', model: 'claude-haiku-4-5' },
+            config: {
+              endpoints: {
+                agents: {},
+                custom: [],
+              },
+              config: {
+                endpoints: {
+                  custom: [
+                    {
+                      name: 'AIPass',
+                      apiKey: 'aipass_oauth',
+                      baseURL: 'https://aipass.one/v1',
+                      customParams: {
+                        nativeWebSearch: {
+                          modelPrefixes: ['gemini-'],
+                          searchModel: 'gemini-3.5-flash-lite',
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const searchTool = await toolMap.web_search();
+
+      expect(searchTool.name).toBe('web_search');
+      expect(mockGetAIPassToken).toHaveBeenCalledWith({ userId: fakeUser._id.toString() });
+    });
+
     it('passes request body to chat MCP tool creation and skips stale cache for BODY-scoped servers', async () => {
       const serverName = 'body-scoped';
       const toolKey = `search${Constants.mcp_delimiter}${serverName}`;

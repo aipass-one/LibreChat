@@ -22,6 +22,7 @@ const {
   EToolResources,
   PermissionTypes,
   normalizeEndpointName,
+  parseEphemeralAgentId,
   getDelegatedWebSearchConfig,
 } = require('librechat-data-provider');
 const {
@@ -356,26 +357,54 @@ const loadTools = async ({
       continue;
     } else if (tool === Tools.web_search) {
       const { onSearchResults, onGetHighlights } = options?.[Tools.web_search] ?? {};
-      const provider = agent?.provider ?? endpoint ?? options.req?.body?.endpoint;
-      const selectedModel = agent?.model ?? model ?? options.req?.body?.model;
-      const configuredEndpoints = options.req?.config?.endpoints;
-      const directEndpointConfig = provider ? configuredEndpoints?.[provider] : undefined;
-      const customEndpoints = configuredEndpoints?.custom;
-      let endpointConfig =
-        directEndpointConfig && !Array.isArray(directEndpointConfig)
-          ? directEndpointConfig
-          : undefined;
-      if (!endpointConfig && Array.isArray(customEndpoints)) {
-        endpointConfig = customEndpoints.find(
-          (candidate) => normalizeEndpointName(candidate.name) === normalizeEndpointName(provider),
-        );
+      const ephemeralAgent = agent?.id ? parseEphemeralAgentId(agent.id) : undefined;
+      const selectedModel =
+        ephemeralAgent?.model ?? agent?.model ?? model ?? options.req?.body?.model;
+      const providerCandidates = [
+        ephemeralAgent?.endpoint,
+        options.req?.body?.endpoint,
+        endpoint,
+        agent?.provider,
+      ].filter(Boolean);
+      const endpointSources = [
+        options.req?.config?.endpoints,
+        options.req?.config?.config?.endpoints,
+      ].filter(Boolean);
+      let endpointConfig;
+      let delegatedSearch;
+
+      endpointSearch: for (const configuredEndpoints of endpointSources) {
+        for (const provider of providerCandidates) {
+          const directEndpointConfig = configuredEndpoints?.[provider];
+          const matchingConfigs = [];
+          if (directEndpointConfig && !Array.isArray(directEndpointConfig)) {
+            matchingConfigs.push(directEndpointConfig);
+          }
+          if (Array.isArray(configuredEndpoints?.custom)) {
+            const customEndpointConfig = configuredEndpoints.custom.find(
+              (candidate) =>
+                normalizeEndpointName(candidate.name) === normalizeEndpointName(provider),
+            );
+            if (customEndpointConfig) {
+              matchingConfigs.push(customEndpointConfig);
+            }
+          }
+
+          for (const candidate of matchingConfigs) {
+            const candidateSearch = getDelegatedWebSearchConfig(
+              candidate.customParams,
+              selectedModel,
+            );
+            if (candidateSearch?.searchModel && candidate.apiKey === AuthType.AIPASS_OAUTH) {
+              endpointConfig = candidate;
+              delegatedSearch = candidateSearch;
+              break endpointSearch;
+            }
+          }
+        }
       }
-      const delegatedSearch = getDelegatedWebSearchConfig(
-        endpointConfig?.customParams,
-        selectedModel,
-      );
-      const usesAIPassDelegatedSearch =
-        delegatedSearch?.searchModel && endpointConfig?.apiKey === AuthType.AIPASS_OAUTH;
+
+      const usesAIPassDelegatedSearch = delegatedSearch?.searchModel && endpointConfig;
 
       if (usesAIPassDelegatedSearch) {
         requestedTools[tool] = async () => {
