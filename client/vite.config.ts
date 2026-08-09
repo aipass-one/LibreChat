@@ -94,14 +94,7 @@ export default defineConfig(({ command }) => ({
       useCredentials: true,
       includeManifestIcons: false,
       workbox: {
-        globPatterns: [
-          '**/*.{js,css,html}',
-          'assets/favicon*.png',
-          'assets/icon-*.png',
-          'assets/apple-touch-icon*.png',
-          'assets/maskable-icon.png',
-          'manifest.webmanifest',
-        ],
+        globPatterns: ['**/*.{js,css,html}', 'assets/aipass-*.{png,svg}', 'manifest.webmanifest'],
         globIgnores: [
           'images/**/*',
           '**/*.map',
@@ -137,37 +130,58 @@ export default defineConfig(({ command }) => ({
       },
       includeAssets: [],
       manifest: {
-        name: 'LibreChat',
-        short_name: 'LibreChat',
+        id: '/',
+        name: 'AI Pass',
+        short_name: 'AI Pass',
+        description: 'One account for every AI model.',
+        start_url: '/c/new',
+        scope: '/',
         display: 'standalone',
-        background_color: '#000000',
-        theme_color: '#009688',
+        orientation: 'any',
+        background_color: '#F7F7FB',
+        theme_color: '#4F46E5',
+        categories: ['productivity', 'utilities'],
         icons: [
           {
-            src: 'assets/favicon-32x32.png',
+            src: 'assets/aipass-icon-32.png',
             sizes: '32x32',
             type: 'image/png',
           },
           {
-            src: 'assets/favicon-16x16.png',
-            sizes: '16x16',
-            type: 'image/png',
-          },
-          {
-            src: 'assets/apple-touch-icon-180x180.png',
+            src: 'assets/aipass-icon-180.png',
             sizes: '180x180',
             type: 'image/png',
           },
           {
-            src: 'assets/icon-192x192.png',
+            src: 'assets/aipass-icon-192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: 'assets/maskable-icon.png',
+            src: 'assets/aipass-icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+          },
+          {
+            src: 'assets/aipass-maskable-icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+        ],
+        shortcuts: [
+          {
+            name: 'New chat',
+            short_name: 'Chat',
+            description: 'Start a new AI Pass conversation',
+            url: '/c/new',
+            icons: [
+              {
+                src: 'assets/aipass-icon-192.png',
+                sizes: '192x192',
+                type: 'image/png',
+              },
+            ],
           },
         ],
       },

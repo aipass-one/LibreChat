@@ -5,6 +5,7 @@ import { TranslationKeys, useLocalize } from '~/hooks';
 import SocialLoginRender from './SocialLoginRender';
 import { BlinkAnimation } from './BlinkAnimation';
 import { Banner } from '../Banners';
+import InstallAIPass from '../PWA/InstallAIPass';
 import Footer from './Footer';
 
 function AuthLayout({
@@ -60,14 +61,16 @@ function AuthLayout({
     <div className="relative flex min-h-screen flex-col bg-white dark:bg-gray-900">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        <div className="mt-6 h-10 w-full bg-cover">
-          <img
-            src="assets/logo.svg"
-            className="h-full w-full object-contain"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
-          />
+        <div className="mt-6 flex h-10 w-full items-center justify-center gap-2">
+          <img src="assets/aipass-icon.svg" className="h-10 w-10" alt="" aria-hidden="true" />
+          <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+            {startupConfig?.appTitle ?? 'AI Pass'}
+          </span>
         </div>
       </BlinkAnimation>
+      <div className="mt-3 flex justify-center">
+        <InstallAIPass />
+      </div>
       <DisplayError />
       <div className="absolute bottom-0 left-0 md:m-4">
         <ThemeSelector />

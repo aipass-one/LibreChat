@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#4F46E5" />
+  <polygon points="0,0 38,0 67,29 0,96" fill="#FFFFFF" fill-opacity="0.12" />
+  <text
+    x="50"
+    y="62"
+    text-anchor="middle"
+    font-family="Outfit, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="42"
+    font-weight="800"
+    letter-spacing="-2"
+    fill="#FFFFFF"
+  >AI</text>
+</svg>
