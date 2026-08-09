@@ -358,13 +358,18 @@ const loadTools = async ({
       const { onSearchResults, onGetHighlights } = options?.[Tools.web_search] ?? {};
       const provider = agent?.provider ?? endpoint ?? options.req?.body?.endpoint;
       const selectedModel = agent?.model ?? model ?? options.req?.body?.model;
-      const customEndpoints = options.req?.config?.endpoints?.custom;
-      const endpointConfig = Array.isArray(customEndpoints)
-        ? customEndpoints.find(
-            (candidate) =>
-              normalizeEndpointName(candidate.name) === normalizeEndpointName(provider),
-          )
-        : undefined;
+      const configuredEndpoints = options.req?.config?.endpoints;
+      const directEndpointConfig = provider ? configuredEndpoints?.[provider] : undefined;
+      const customEndpoints = configuredEndpoints?.custom;
+      let endpointConfig =
+        directEndpointConfig && !Array.isArray(directEndpointConfig)
+          ? directEndpointConfig
+          : undefined;
+      if (!endpointConfig && Array.isArray(customEndpoints)) {
+        endpointConfig = customEndpoints.find(
+          (candidate) => normalizeEndpointName(candidate.name) === normalizeEndpointName(provider),
+        );
+      }
       const delegatedSearch = getDelegatedWebSearchConfig(
         endpointConfig?.customParams,
         selectedModel,
