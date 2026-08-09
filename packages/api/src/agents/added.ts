@@ -6,8 +6,9 @@ import {
   isEphemeralAgentId,
   appendAgentIdSuffix,
   encodeEphemeralAgentId,
+  getNativeWebSearchConfig,
 } from 'librechat-data-provider';
-import type { Agent, TConversation, TModelSpec } from 'librechat-data-provider';
+import type { Agent, TConfig, TConversation, TModelSpec } from 'librechat-data-provider';
 import type { AppConfig } from '@librechat/data-schemas';
 import { requiresEphemeralUserConnection } from '~/mcp/utils';
 import { getCustomEndpointConfig } from '~/app/config';
@@ -141,12 +142,16 @@ export async function loadAddedAgent(
       (endpointConfig?.modelDisplayLabel as string | undefined) ??
       '';
     const ephemeralId = encodeEphemeralAgentId({ endpoint, model, sender, index: 1 });
+    const customParams = endpointConfig?.customParams as TConfig['customParams'];
+    const nativeWebSearch = getNativeWebSearchConfig(customParams, model);
+    const primaryUsesNativeWebSearch =
+      (primaryAgent.model_parameters as Record<string, unknown> | undefined)?.web_search === true;
 
     const result: Record<string, unknown> = {
       id: ephemeralId,
       instructions: promptPrefix || '',
       provider: endpoint,
-      model_parameters: {},
+      model_parameters: primaryUsesNativeWebSearch && nativeWebSearch ? { web_search: true } : {},
       model,
       tools: [...primaryAgent.tools],
     };
@@ -169,6 +174,19 @@ export async function loadAddedAgent(
     }
   }
 
+  let endpointConfig = (appConfig?.endpoints as Record<string, unknown> | undefined)?.[endpoint] as
+    | Record<string, unknown>
+    | undefined;
+  if (!isAgentsEndpoint(endpoint) && !endpointConfig) {
+    try {
+      endpointConfig = getCustomEndpointConfig({ endpoint, appConfig }) as
+        | Record<string, unknown>
+        | undefined;
+    } catch (err) {
+      logger.error('[loadAddedAgent] Error getting custom endpoint config', err);
+    }
+  }
+
   const tools: string[] = [];
   if (ephemeralAgent?.execute_code === true || modelSpec?.executeCode === true) {
     tools.push(Tools.execute_code);
@@ -176,7 +194,11 @@ export async function loadAddedAgent(
   if (ephemeralAgent?.file_search === true || modelSpec?.fileSearch === true) {
     tools.push(Tools.file_search);
   }
-  if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
+  const webSearchSelected = ephemeralAgent?.web_search === true || modelSpec?.webSearch === true;
+  const customParams = endpointConfig?.customParams as TConfig['customParams'];
+  const nativeWebSearch = getNativeWebSearchConfig(customParams, model);
+  const endpointUsesNativeWebSearch = customParams?.nativeWebSearch != null;
+  if (webSearchSelected && !endpointUsesNativeWebSearch) {
     tools.push(Tools.web_search);
   }
 
@@ -218,18 +240,8 @@ export async function loadAddedAgent(
       model_parameters[key] = (rest as Record<string, unknown>)[key];
     }
   }
-
-  let endpointConfig = (appConfig?.endpoints as Record<string, unknown> | undefined)?.[endpoint] as
-    | Record<string, unknown>
-    | undefined;
-  if (!isAgentsEndpoint(endpoint) && !endpointConfig) {
-    try {
-      endpointConfig = getCustomEndpointConfig({ endpoint, appConfig }) as
-        | Record<string, unknown>
-        | undefined;
-    } catch (err) {
-      logger.error('[loadAddedAgent] Error getting custom endpoint config', err);
-    }
+  if (webSearchSelected && nativeWebSearch) {
+    model_parameters.web_search = true;
   }
 
   const sender =

@@ -530,6 +530,13 @@ endpoints:
     #       method: 'chat_completions'
     #   titleConvo: true
     #   modelDisplayLabel: 'AIPass'
+    #   customParams:
+    #     # Use Gemini's built-in Google Search grounding instead of LibreChat's
+    #     # external search/scrape/rerank providers. The UI shows this cost and
+    #     # keeps the switch hidden for models that do not match these prefixes.
+    #     nativeWebSearch:
+    #       modelPrefixes: ['gemini-']
+    #       pricePerQuery: 0.014
 
     # Anthropic-compatible Example (native `/v1/messages` API)
     # Set `provider: anthropic` to use the native Anthropic client instead of the

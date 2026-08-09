@@ -458,9 +458,26 @@ export type TConfig = {
     reasoningKey?: ReasoningResponseKey;
     includeReasoningContent?: boolean;
     includeReasoningHistory?: boolean;
+    nativeWebSearch?: {
+      modelPrefixes: string[];
+      pricePerQuery?: number;
+    };
     paramDefinitions?: Partial<SettingDefinition>[];
   };
 };
+
+export function getNativeWebSearchConfig(
+  customParams: TConfig['customParams'] | null | undefined,
+  model: string | null | undefined,
+): NonNullable<NonNullable<TConfig['customParams']>['nativeWebSearch']> | null {
+  const config = customParams?.nativeWebSearch;
+  if (!config || typeof model !== 'string' || model.length === 0) {
+    return null;
+  }
+
+  const normalizedModel = model.replace(/^~/, '');
+  return config.modelPrefixes.some((prefix) => normalizedModel.startsWith(prefix)) ? config : null;
+}
 
 export type TEndpointsConfig =
   | Record<EModelEndpoint | string, TConfig | null | undefined>

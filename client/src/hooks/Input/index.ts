@@ -5,6 +5,7 @@ export { default as useTextarea } from './useTextarea';
 export { default as useQueryParams } from './useQueryParams';
 export { default as useHandleKeyUp } from './useHandleKeyUp';
 export { default as useRequiresKey } from './useRequiresKey';
+export { default as useNativeWebSearch } from './useNativeWebSearch';
 export { default as useMultipleKeys } from './useMultipleKeys';
 export { default as useSpeechToText } from './useSpeechToText';
 export { default as useTextToSpeech } from './useTextToSpeech';

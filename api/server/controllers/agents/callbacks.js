@@ -25,6 +25,7 @@ const {
 const { processFileCitations } = require('~/server/services/Files/Citations');
 const { processCodeOutput, runPreviewFinalize } = require('~/server/services/Files/Code/process');
 const { saveBase64Image } = require('~/server/services/Files/process');
+const { withUrlCitationSources } = require('./urlCitations');
 
 function isHostFileAuthoringArtifact(artifact) {
   return artifact?.[HOST_FILE_AUTHORING_ARTIFACT_KEY] === true;
@@ -421,11 +422,12 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
-        aggregateContent({ event, data });
+        const citedData = withUrlCitationSources(data);
+        aggregateContent({ event, data: citedData });
         if (checkIfLastAgent(metadata?.last_agent_id, metadata?.langgraph_node)) {
-          await emitEvent(res, streamId, { event, data });
+          await emitEvent(res, streamId, { event, data: citedData });
         } else if (!metadata?.hide_sequential_outputs) {
-          await emitEvent(res, streamId, { event, data });
+          await emitEvent(res, streamId, { event, data: citedData });
         }
       },
     },

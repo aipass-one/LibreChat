@@ -874,6 +874,18 @@ export const endpointSchema = baseEndpointSchema.merge(
         includeReasoningContent: z.boolean().optional(),
         /** Also reconstructs `reasoning_content` from persisted history across turns (implies `includeReasoningContent`). */
         includeReasoningHistory: z.boolean().optional(),
+        /**
+         * Enables a provider's built-in web-search tool for matching models.
+         * This is distinct from LibreChat's search/scrape/rerank toolchain and
+         * therefore requires no third-party search credentials.
+         */
+        nativeWebSearch: z
+          .object({
+            modelPrefixes: z.array(z.string().min(1)).min(1),
+            pricePerQuery: z.number().nonnegative().optional(),
+          })
+          .strict()
+          .optional(),
         paramDefinitions: z.array(paramDefinitionSchema).optional(),
       })
       .strict()

@@ -59,6 +59,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   const {
     skills,
     webSearch,
+    nativeWebSearch,
     artifacts,
     fileSearch,
     mcpServerManager,
@@ -79,10 +80,11 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   const { isPinned: isSkillsPinned, setIsPinned: setIsSkillsPinned } = skills ?? {};
 
   const showWebSearchSettings = useMemo(() => {
+    if (nativeWebSearch?.isAvailable) return false;
     const authTypes = webSearchAuthData?.authTypes ?? [];
     if (authTypes.length === 0) return true;
     return !authTypes.every(([, authType]) => authType === AuthType.SYSTEM_DEFINED);
-  }, [webSearchAuthData?.authTypes]);
+  }, [nativeWebSearch?.isAvailable, webSearchAuthData?.authTypes]);
 
   const handleWebSearchToggle = useCallback(() => {
     const newValue = !webSearch?.toggleState;
@@ -167,7 +169,8 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
     });
   }
 
-  if (canUseWebSearch && webSearchEnabled) {
+  const showWebSearch = nativeWebSearch?.isManaged ? nativeWebSearch.isAvailable : webSearchEnabled;
+  if (canUseWebSearch && showWebSearch) {
     dropdownItems.push({
       onClick: handleWebSearchToggle,
       hideOnClick: false,
@@ -176,6 +179,16 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
           <div className="flex items-center gap-2">
             <Globe className="icon-md" aria-hidden="true" />
             <span>{localize('com_ui_web_search')}</span>
+            {nativeWebSearch?.isAvailable && nativeWebSearch.pricePerQuery != null && (
+              <span
+                className="text-xs text-text-secondary"
+                title={localize('com_ui_web_search_native_price_help')}
+              >
+                {localize('com_ui_web_search_native_price', {
+                  0: `$${nativeWebSearch.pricePerQuery.toFixed(3)}`,
+                })}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {showWebSearchSettings && (
