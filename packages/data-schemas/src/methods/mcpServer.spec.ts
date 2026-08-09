@@ -141,6 +141,37 @@ describe('MCPServer Model Tests', () => {
       expect(server.serverName).toBe('test-server-2');
     });
 
+    test('should append suffix when base name is reserved', async () => {
+      const server = await methods.createMCPServer({
+        config: createSSEConfig('Test Server'),
+        author: authorId,
+        reservedServerNames: ['test-server'],
+      });
+
+      expect(server.serverName).toBe('test-server-2');
+    });
+
+    test('should skip both DB and reserved names when finding next suffix', async () => {
+      await MCPServer.create({
+        serverName: 'test-server',
+        config: createSSEConfig('Test Server'),
+        author: authorId,
+      });
+      await MCPServer.create({
+        serverName: 'test-server-2',
+        config: createSSEConfig('Test Server'),
+        author: authorId,
+      });
+
+      const server = await methods.createMCPServer({
+        config: createSSEConfig('Test Server'),
+        author: authorId,
+        reservedServerNames: ['test-server-3'],
+      });
+
+      expect(server.serverName).toBe('test-server-4');
+    });
+
     test('should find next available number in sequence', async () => {
       // Create servers with sequential names
       await MCPServer.create({
@@ -228,22 +259,22 @@ describe('MCPServer Model Tests', () => {
     });
   });
 
-  describe('findMCPServerById', () => {
+  describe('findMCPServerByServerName', () => {
     test('should find server by serverName', async () => {
       const created = await methods.createMCPServer({
-        config: createSSEConfig('Find By Id Test'),
+        config: createSSEConfig('Find By Name Test'),
         author: authorId,
       });
 
-      const found = await methods.findMCPServerById(created.serverName);
+      const found = await methods.findMCPServerByServerName(created.serverName);
 
       expect(found).toBeDefined();
-      expect(found?.serverName).toBe('find-by-id-test');
-      expect(found?.config.title).toBe('Find By Id Test');
+      expect(found?.serverName).toBe('find-by-name-test');
+      expect(found?.config.title).toBe('Find By Name Test');
     });
 
     test('should return null when server not found', async () => {
-      const found = await methods.findMCPServerById('non-existent-server');
+      const found = await methods.findMCPServerByServerName('non-existent-server');
 
       expect(found).toBeNull();
     });
@@ -254,7 +285,7 @@ describe('MCPServer Model Tests', () => {
         author: authorId,
       });
 
-      const found = await methods.findMCPServerById('lean-test');
+      const found = await methods.findMCPServerByServerName('lean-test');
 
       // Lean documents don't have mongoose methods
       expect(found).toBeDefined();
@@ -621,7 +652,7 @@ describe('MCPServer Model Tests', () => {
       expect(deleted?.serverName).toBe('delete-test');
 
       // Verify it's actually deleted
-      const found = await methods.findMCPServerById('delete-test');
+      const found = await methods.findMCPServerByServerName('delete-test');
       expect(found).toBeNull();
     });
 

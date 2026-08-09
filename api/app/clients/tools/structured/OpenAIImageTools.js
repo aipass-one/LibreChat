@@ -2,12 +2,18 @@ const axios = require('axios');
 const { v4 } = require('uuid');
 const OpenAI = require('openai');
 const FormData = require('form-data');
-const { ProxyAgent } = require('undici');
-const { tool } = require('@langchain/core/tools');
 const { logger } = require('@librechat/data-schemas');
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const { tool } = require('@librechat/agents/langchain/tools');
 const { ContentTypes, EImageOutputType } = require('librechat-data-provider');
-const { logAxiosError, oaiToolkit, extractBaseURL } = require('@librechat/api');
+const {
+  logAxiosError,
+  oaiToolkit,
+  extractBaseURL,
+  getProxyDispatcher,
+  applyAxiosProxyConfig,
+  AIPASS_DEFAULT_IMAGE_EDIT_MODEL,
+  AIPASS_DEFAULT_IMAGE_GENERATION_MODEL,
+} = require('@librechat/api');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { getFiles } = require('~/models');
 
@@ -45,11 +51,87 @@ function createAbortHandler() {
 }
 
 /**
+ * @param {string | undefined} configuredModel
+ * @param {string[]} availableModels
+ * @param {string} preferredModel
+ * @param {string} fallbackModel
+ * @returns {string}
+ */
+function resolveDefaultModel(configuredModel, availableModels, preferredModel, fallbackModel) {
+  if (configuredModel) {
+    return configuredModel;
+  }
+  if (availableModels.includes(preferredModel)) {
+    return preferredModel;
+  }
+  return availableModels[0] || fallbackModel;
+}
+
+/**
+ * @param {Object} toolkit
+ * @param {string[]} availableModels
+ * @param {string} defaultModel
+ * @returns {Object}
+ */
+function addModelSelection(toolkit, availableModels, defaultModel) {
+  if (availableModels.length === 0) {
+    return toolkit;
+  }
+
+  return {
+    ...toolkit,
+    schema: {
+      ...toolkit.schema,
+      properties: {
+        ...toolkit.schema.properties,
+        model: {
+          type: 'string',
+          enum: availableModels,
+          description: `AI Pass image model to use. Defaults to ${defaultModel}.`,
+        },
+      },
+    },
+  };
+}
+
+/**
+ * @param {string | undefined} requestedModel
+ * @param {string[]} availableModels
+ * @param {string} defaultModel
+ * @returns {string}
+ */
+function selectModel(requestedModel, availableModels, defaultModel) {
+  if (!requestedModel) {
+    return defaultModel;
+  }
+  if (availableModels.length > 0 && !availableModels.includes(requestedModel)) {
+    throw new Error(`Image model "${requestedModel}" is not available through AI Pass.`);
+  }
+  return requestedModel;
+}
+
+/**
+ * @param {{ b64_json?: string, url?: string } | undefined} image
+ * @param {string} outputFormat
+ * @returns {string | null}
+ */
+function resolveImageURL(image, outputFormat) {
+  if (image?.b64_json) {
+    return `data:image/${outputFormat};base64,${image.b64_json}`;
+  }
+  return image?.url || null;
+}
+
+/**
  * Creates OpenAI Image tools (generation and editing)
  * @param {Object} fields - Configuration fields
  * @param {ServerRequest} fields.req - Whether the tool is being used in an agent context
  * @param {boolean} fields.isAgent - Whether the tool is being used in an agent context
  * @param {string} fields.IMAGE_GEN_OAI_API_KEY - The OpenAI API key
+ * @param {string} [fields.IMAGE_GEN_OAI_BASEURL] - Request-scoped image API base URL
+ * @param {boolean} [fields.usesAIPassOAuth] - Whether the key came from AI Pass OAuth
+ * @param {string[]} [fields.imageGenerationModels] - Available AI Pass generation models
+ * @param {string[]} [fields.imageEditModels] - Available AI Pass editing models
  * @param {boolean} [fields.override] - Whether to override the API key check, necessary for app initialization
  * @param {MongoFile[]} [fields.imageFiles] - The images to be used for editing
  * @param {string} [fields.imageOutputType] - The image output type configuration
@@ -75,12 +157,29 @@ function createOpenAIImageTools(fields = {}) {
     return apiKey;
   };
 
-  let apiKey = fields.IMAGE_GEN_OAI_API_KEY ?? getApiKey();
+  const apiKey = fields.IMAGE_GEN_OAI_API_KEY ?? getApiKey();
   const closureConfig = { apiKey };
 
+  const usesAIPassOAuth = fields.usesAIPassOAuth === true;
+  const imageGenerationModels = fields.imageGenerationModels ?? [];
+  const imageEditModels = fields.imageEditModels ?? [];
+  const imageModel = resolveDefaultModel(
+    process.env.IMAGE_GEN_OAI_MODEL,
+    imageGenerationModels,
+    AIPASS_DEFAULT_IMAGE_GENERATION_MODEL,
+    usesAIPassOAuth ? AIPASS_DEFAULT_IMAGE_GENERATION_MODEL : 'gpt-image-1',
+  );
+  const imageEditModel = resolveDefaultModel(
+    process.env.IMAGE_EDIT_OAI_MODEL,
+    imageEditModels,
+    AIPASS_DEFAULT_IMAGE_EDIT_MODEL,
+    usesAIPassOAuth ? AIPASS_DEFAULT_IMAGE_EDIT_MODEL : imageModel,
+  );
+
   let baseURL = 'https://api.openai.com/v1/';
-  if (!override && process.env.IMAGE_GEN_OAI_BASEURL) {
-    baseURL = extractBaseURL(process.env.IMAGE_GEN_OAI_BASEURL);
+  const configuredBaseURL = fields.IMAGE_GEN_OAI_BASEURL ?? process.env.IMAGE_GEN_OAI_BASEURL;
+  if (!override && configuredBaseURL) {
+    baseURL = extractBaseURL(configuredBaseURL);
     closureConfig.baseURL = baseURL;
   }
 
@@ -108,6 +207,7 @@ function createOpenAIImageTools(fields = {}) {
   const imageGenTool = tool(
     async (
       {
+        model,
         prompt,
         background = 'auto',
         n = 1,
@@ -121,10 +221,10 @@ function createOpenAIImageTools(fields = {}) {
         throw new Error('Missing required field: prompt');
       }
       const clientConfig = { ...closureConfig };
-      if (process.env.PROXY) {
-        const proxyAgent = new ProxyAgent(process.env.PROXY);
+      const proxyDispatcher = getProxyDispatcher();
+      if (proxyDispatcher) {
         clientConfig.fetchOptions = {
-          dispatcher: proxyAgent,
+          dispatcher: proxyDispatcher,
         };
       }
 
@@ -157,7 +257,7 @@ function createOpenAIImageTools(fields = {}) {
 
         resp = await openai.images.generate(
           {
-            model: 'gpt-image-1',
+            model: selectModel(model, imageGenerationModels, imageModel),
             prompt: replaceUnwantedChars(prompt),
             n: Math.min(Math.max(1, n), 10),
             background,
@@ -176,7 +276,7 @@ function createOpenAIImageTools(fields = {}) {
       } catch (error) {
         const message = '[image_gen_oai] Problem generating the image:';
         logAxiosError({ error, message });
-        return returnValue(`Something went wrong when trying to generate the image. The OpenAI API may be unavailable:
+        return returnValue(`Something went wrong when trying to generate the image. The image API may be unavailable:
 Error Message: ${error.message}`);
       } finally {
         if (abortHandler && derivedSignal) {
@@ -186,17 +286,15 @@ Error Message: ${error.message}`);
 
       if (!resp) {
         return returnValue(
-          'Something went wrong when trying to generate the image. The OpenAI API may be unavailable',
+          'Something went wrong when trying to generate the image. The image API may be unavailable',
         );
       }
 
-      // For gpt-image-1, the response contains base64-encoded images
       // TODO: handle cost in `resp.usage`
-      const base64Image = resp.data[0].b64_json;
-
-      if (!base64Image) {
+      const imageURL = resolveImageURL(resp.data?.[0], output_format);
+      if (!imageURL) {
         return returnValue(
-          'No image data returned from OpenAI API. There may be a problem with the API or your configuration.',
+          'No image data returned from the image API. There may be a problem with the provider or your configuration.',
         );
       }
 
@@ -204,7 +302,7 @@ Error Message: ${error.message}`);
         {
           type: ContentTypes.IMAGE_URL,
           image_url: {
-            url: `data:image/${output_format};base64,${base64Image}`,
+            url: imageURL,
           },
         },
       ];
@@ -218,31 +316,30 @@ Error Message: ${error.message}`);
       ];
       return [response, { content, file_ids }];
     },
-    oaiToolkit.image_gen_oai,
+    addModelSelection(oaiToolkit.image_gen_oai, imageGenerationModels, imageModel),
   );
 
   /**
    * Image Editing Tool
    */
   const imageEditTool = tool(
-    async ({ prompt, image_ids, quality = 'auto', size = 'auto' }, runnableConfig) => {
+    async ({ model, prompt, image_ids, quality = 'auto', size = 'auto' }, runnableConfig) => {
       if (!prompt) {
         throw new Error('Missing required field: prompt');
       }
 
       const clientConfig = { ...closureConfig };
-      if (process.env.PROXY) {
-        const proxyAgent = new ProxyAgent(process.env.PROXY);
+      const proxyDispatcher = getProxyDispatcher();
+      if (proxyDispatcher) {
         clientConfig.fetchOptions = {
-          dispatcher: proxyAgent,
+          dispatcher: proxyDispatcher,
         };
       }
 
       const formData = new FormData();
-      formData.append('model', 'gpt-image-1');
+      formData.append('model', selectModel(model, imageEditModels, imageEditModel));
       formData.append('prompt', replaceUnwantedChars(prompt));
       // TODO: `mask` support
-      // TODO: more than 1 image support
       // formData.append('n', n.toString());
       formData.append('quality', quality);
       formData.append('size', size);
@@ -310,7 +407,7 @@ Error Message: ${error.message}`);
         if (!stream) {
           throw new Error('Failed to get download stream for image file');
         }
-        formData.append('image[]', stream, {
+        formData.append(usesAIPassOAuth ? 'image' : 'image[]', stream, {
           filename: imageFile.filename,
           contentType: imageFile.type,
         });
@@ -347,9 +444,7 @@ Error Message: ${error.message}`);
           baseURL,
         };
 
-        if (process.env.PROXY) {
-          axiosConfig.httpsAgent = new HttpsProxyAgent(process.env.PROXY);
-        }
+        applyAxiosProxyConfig(axiosConfig, baseURL);
 
         if (process.env.IMAGE_GEN_OAI_AZURE_API_VERSION && process.env.IMAGE_GEN_OAI_BASEURL) {
           axiosConfig.params = {
@@ -365,10 +460,10 @@ Error Message: ${error.message}`);
           );
         }
 
-        const base64Image = response.data.data[0].b64_json;
-        if (!base64Image) {
+        const imageURL = resolveImageURL(response.data.data[0], imageOutputType);
+        if (!imageURL) {
           return returnValue(
-            'No image data returned from OpenAI API. There may be a problem with the API or your configuration.',
+            'No image data returned from the image API. There may be a problem with the provider or your configuration.',
           );
         }
 
@@ -376,7 +471,7 @@ Error Message: ${error.message}`);
           {
             type: ContentTypes.IMAGE_URL,
             image_url: {
-              url: `data:image/${imageOutputType};base64,${base64Image}`,
+              url: imageURL,
             },
           },
         ];
@@ -394,7 +489,7 @@ Error Message: ${error.message}`);
       } catch (error) {
         const message = '[image_edit_oai] Problem editing the image:';
         logAxiosError({ error, message });
-        return returnValue(`Something went wrong when trying to edit the image. The OpenAI API may be unavailable:
+        return returnValue(`Something went wrong when trying to edit the image. The image API may be unavailable:
 Error Message: ${error.message || 'Unknown error'}`);
       } finally {
         if (abortHandler && derivedSignal) {
@@ -402,7 +497,7 @@ Error Message: ${error.message || 'Unknown error'}`);
         }
       }
     },
-    oaiToolkit.image_edit_oai,
+    addModelSelection(oaiToolkit.image_edit_oai, imageEditModels, imageEditModel),
   );
 
   return [imageGenTool, imageEditTool];

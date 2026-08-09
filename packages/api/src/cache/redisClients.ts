@@ -1,9 +1,9 @@
 import IoRedis from 'ioredis';
-import type { Redis, Cluster } from 'ioredis';
 import { logger } from '@librechat/data-schemas';
 import { createClient, createCluster } from '@keyv/redis';
-import type { RedisClientType, RedisClusterType } from '@redis/client';
 import type { ScanCommandOptions } from '@redis/client/dist/lib/commands/SCAN';
+import type { RedisClientType, RedisClusterType } from '@redis/client';
+import type { Redis, Cluster } from 'ioredis';
 import { cacheConfig } from './cacheConfig';
 
 const urls = cacheConfig.REDIS_URI?.split(',').map((uri) => new URL(uri)) || [];
@@ -29,7 +29,9 @@ if (cacheConfig.USE_REDIS) {
         );
         return null;
       }
-      const delay = Math.min(times * 50, cacheConfig.REDIS_RETRY_MAX_DELAY);
+      const base = Math.min(Math.pow(2, times) * 50, cacheConfig.REDIS_RETRY_MAX_DELAY);
+      const jitter = Math.floor(Math.random() * Math.min(base, 1000));
+      const delay = Math.min(base + jitter, cacheConfig.REDIS_RETRY_MAX_DELAY);
       logger.info(`ioredis reconnecting... attempt ${times}, delay ${delay}ms`);
       return delay;
     },
@@ -71,7 +73,9 @@ if (cacheConfig.USE_REDIS) {
                 );
                 return null;
               }
-              const delay = Math.min(times * 100, cacheConfig.REDIS_RETRY_MAX_DELAY);
+              const base = Math.min(Math.pow(2, times) * 100, cacheConfig.REDIS_RETRY_MAX_DELAY);
+              const jitter = Math.floor(Math.random() * Math.min(base, 1000));
+              const delay = Math.min(base + jitter, cacheConfig.REDIS_RETRY_MAX_DELAY);
               logger.info(`ioredis cluster reconnecting... attempt ${times}, delay ${delay}ms`);
               return delay;
             },
@@ -149,7 +153,9 @@ if (cacheConfig.USE_REDIS) {
           );
           return new Error('Max reconnection attempts reached');
         }
-        const delay = Math.min(retries * 100, cacheConfig.REDIS_RETRY_MAX_DELAY);
+        const base = Math.min(Math.pow(2, retries) * 100, cacheConfig.REDIS_RETRY_MAX_DELAY);
+        const jitter = Math.floor(Math.random() * Math.min(base, 1000));
+        const delay = Math.min(base + jitter, cacheConfig.REDIS_RETRY_MAX_DELAY);
         logger.info(`@keyv/redis reconnecting... attempt ${retries}, delay ${delay}ms`);
         return delay;
       },
@@ -211,7 +217,6 @@ if (cacheConfig.USE_REDIS) {
 
   keyvRedisClientReady.catch((err): void => {
     logger.error('@keyv/redis initial connection failed:', err);
-    throw err;
   });
 }
 

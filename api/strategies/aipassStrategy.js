@@ -1,13 +1,17 @@
 const passport = require('passport');
 const { Strategy: OAuth2Strategy } = require('passport-oauth2');
-const { hashToken } = require('@librechat/data-schemas');
+const { hashToken, logger } = require('@librechat/data-schemas');
 const { getBalanceConfig, isEmailDomainAllowed } = require('@librechat/api');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { findUser, createUser, updateUser } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const stateStore = require('./aipassStateStore');
 
-const AIPASS_BASE_URL = process.env.AIPASS_ISSUER || 'https://aipass.one';
+const AIPASS_BASE_URL = (
+  process.env.AIPASS_BASE_URL ||
+  process.env.AIPASS_ISSUER ||
+  'https://aipass.one'
+).replace(/\/+$/, '');
 
 const aipassConfig = {
   authorizationURL: `${AIPASS_BASE_URL}/oauth2/authorize`,
@@ -65,7 +69,8 @@ async function downloadAvatar(url, accessToken) {
 }
 
 async function setupAIPass() {
-  const callbackURL = `${process.env.DOMAIN_SERVER}${process.env.AIPASS_CALLBACK_URL}`;
+  const callbackPath = process.env.AIPASS_CALLBACK_URL || '/oauth/aipass/callback';
+  const callbackURL = `${process.env.DOMAIN_SERVER}${callbackPath}`;
 
   const strategy = new OAuth2Strategy(
     {
@@ -82,7 +87,7 @@ async function setupAIPass() {
     async (accessToken, refreshToken, params, profile, done) => {
       try {
         const userinfo = await fetchUserInfo(accessToken);
-        const appConfig = await getAppConfig();
+        const appConfig = await getAppConfig({ baseOnly: true });
         const email = userinfo.email;
 
         if (!isEmailDomainAllowed(email, appConfig?.registration?.allowedDomains)) {
@@ -101,7 +106,8 @@ async function setupAIPass() {
             ? `${userinfo.given_name} ${userinfo.family_name}`
             : userinfo.given_name || userinfo.family_name || userinfo.username || email);
 
-        const username = userinfo.preferred_username || userinfo.username || email?.split('@')[0] || 'user';
+        const username =
+          userinfo.preferred_username || userinfo.username || email?.split('@')[0] || 'user';
 
         if (!user) {
           const balanceConfig = getBalanceConfig(appConfig);
@@ -135,11 +141,17 @@ async function setupAIPass() {
           if (imageBuffer) {
             try {
               const fileName = (await hashToken(userinfo.sub)) + '.png';
-              const { saveBuffer } = getStrategyFunctions(appConfig?.fileStrategy ?? process.env.CDN_PROVIDER);
-              const imagePath = await saveBuffer({ fileName, userId: user._id.toString(), buffer: imageBuffer });
+              const { saveBuffer } = getStrategyFunctions(
+                appConfig?.fileStrategy ?? process.env.CDN_PROVIDER,
+              );
+              const imagePath = await saveBuffer({
+                fileName,
+                userId: user._id.toString(),
+                buffer: imageBuffer,
+              });
               user.avatar = imagePath ?? '';
-            } catch {
-              // Avatar save failed, continue without it
+            } catch (error) {
+              logger.warn('[AIPass OAuth] Avatar save failed; continuing without it', error);
             }
           }
         }
@@ -169,7 +181,12 @@ async function setupAIPass() {
     if (params.code_verifier) {
       exchangeCodeForTokens(code, params.code_verifier, params.redirect_uri || callbackURL)
         .then((tokenData) => {
-          callback(null, tokenData.access_token || tokenData.accessToken, tokenData.refresh_token || tokenData.refreshToken, tokenData);
+          callback(
+            null,
+            tokenData.access_token || tokenData.accessToken,
+            tokenData.refresh_token || tokenData.refreshToken,
+            tokenData,
+          );
         })
         .catch(callback);
     } else {

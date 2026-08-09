@@ -20,7 +20,7 @@ const ToolCacheKeys = {
  * @returns {Promise<LCAvailableTools|null>} The available tools object or null if not cached
  */
 async function getCachedTools(options = {}) {
-  const cache = getLogStores(CacheKeys.CONFIG_STORE);
+  const cache = getLogStores(CacheKeys.TOOL_CACHE);
   const { userId, serverName } = options;
 
   // Return MCP server-specific tools if requested
@@ -43,7 +43,7 @@ async function getCachedTools(options = {}) {
  * @returns {Promise<boolean>} Whether the operation was successful
  */
 async function setCachedTools(tools, options = {}) {
-  const cache = getLogStores(CacheKeys.CONFIG_STORE);
+  const cache = getLogStores(CacheKeys.TOOL_CACHE);
   const { userId, serverName, ttl = Time.TWELVE_HOURS } = options;
 
   // Cache by MCP server if specified (requires userId)
@@ -65,7 +65,7 @@ async function setCachedTools(tools, options = {}) {
  * @returns {Promise<void>}
  */
 async function invalidateCachedTools(options = {}) {
-  const cache = getLogStores(CacheKeys.CONFIG_STORE);
+  const cache = getLogStores(CacheKeys.TOOL_CACHE);
   const { userId, serverName, invalidateGlobal = false } = options;
 
   const keysToDelete = [];
@@ -81,28 +81,9 @@ async function invalidateCachedTools(options = {}) {
   await Promise.all(keysToDelete.map((key) => cache.delete(key)));
 }
 
-/**
- * Gets MCP tools for a specific server from cache
- * @function getMCPServerTools
- * @param {string} userId - The user ID
- * @param {string} serverName - The MCP server name
- * @returns {Promise<LCAvailableTools|null>} The available tools for the server
- */
-async function getMCPServerTools(userId, serverName) {
-  const cache = getLogStores(CacheKeys.CONFIG_STORE);
-  const serverTools = await cache.get(ToolCacheKeys.MCP_SERVER(userId, serverName));
-
-  if (serverTools) {
-    return serverTools;
-  }
-
-  return null;
-}
-
 module.exports = {
   ToolCacheKeys,
   getCachedTools,
   setCachedTools,
-  getMCPServerTools,
   invalidateCachedTools,
 };

@@ -227,10 +227,11 @@ export default function Fork({
   });
 
   const buttonStyle = cn(
-    'hover-button rounded-lg p-1.5 text-text-secondary-alt transition-colors duration-200',
+    'hover-button rounded-lg p-1.5 text-text-secondary-alt',
     'hover:text-text-primary hover:bg-surface-hover',
-    'md:group-hover:visible md:group-focus-within:visible md:group-[.final-completion]:visible',
-    !isLast && 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100',
+    'group-hover:visible group-focus-within:visible group-[.final-completion]:visible',
+    !isLast &&
+      'group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0',
     'focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:outline-none',
     isActive && 'active text-text-primary bg-surface-hover',
   );

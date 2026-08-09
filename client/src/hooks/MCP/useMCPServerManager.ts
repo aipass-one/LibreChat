@@ -1,17 +1,32 @@
 import { useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import { useAtom } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { Constants, QueryKeys, MCPOptions, ResourceType } from 'librechat-data-provider';
+import {
+  Constants,
+  QueryKeys,
+  MCPOptions,
+  Permissions,
+  ResourceType,
+  PermissionTypes,
+} from 'librechat-data-provider';
 import {
   useCancelMCPOAuthMutation,
   useUpdateUserPluginsMutation,
   useReinitializeMCPServerMutation,
   useGetAllEffectivePermissionsQuery,
 } from 'librechat-data-provider/react-query';
-import type { TUpdateUserPlugins, TPlugin, MCPServersResponse } from 'librechat-data-provider';
+import type {
+  TUpdateUserPlugins,
+  TPlugin,
+  MCPServersResponse,
+  MCPConnectionStatusResponse,
+} from 'librechat-data-provider';
+import type { MCPServerInitState } from '~/store/mcp';
 import type { ConfigFieldDetail } from '~/common';
-import { useLocalize, useMCPSelect, useMCPConnectionStatus } from '~/hooks';
+import { useLocalize, useHasAccess, useMCPSelect, useMCPConnectionStatus } from '~/hooks';
 import { useGetStartupConfig, useMCPServersQuery } from '~/data-provider';
+import { mcpServerInitStatesAtom, getServerInitState } from '~/store/mcp';
 
 export interface MCPServerDefinition {
   serverName: string;
@@ -21,24 +36,30 @@ export interface MCPServerDefinition {
   consumeOnly?: boolean;
 }
 
-interface ServerState {
-  isInitializing: boolean;
-  oauthUrl: string | null;
-  oauthStartTime: number | null;
-  isCancellable: boolean;
-  pollInterval: NodeJS.Timeout | null;
-}
+// Poll intervals are kept local since they're timer references that can't be serialized
+// The init states (isInitializing, isCancellable, etc.) are stored in the global Jotai atom
+type PollIntervals = Record<string, NodeJS.Timeout | null>;
 
-export function useMCPServerManager({ conversationId }: { conversationId?: string | null } = {}) {
+export function useMCPServerManager({
+  conversationId,
+  storageContextKey,
+}: { conversationId?: string | null; storageContextKey?: string } = {}) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
-  const { data: startupConfig } = useGetStartupConfig(); // Keep for UI config only
+  /** Retained for `interface.mcpServers.placeholder` used by `placeholderText` below */
+  const { data: startupConfig } = useGetStartupConfig();
+  const canUseMcp = useHasAccess({
+    permissionType: PermissionTypes.MCP_SERVERS,
+    permission: Permissions.USE,
+  });
 
-  const { data: loadedServers, isLoading } = useMCPServersQuery();
+  const { data: loadedServers, isLoading } = useMCPServersQuery({ enabled: canUseMcp });
 
   // Fetch effective permissions for all MCP servers
-  const { data: permissionsMap } = useGetAllEffectivePermissionsQuery(ResourceType.MCPSERVER);
+  const { data: permissionsMap } = useGetAllEffectivePermissionsQuery(ResourceType.MCPSERVER, {
+    enabled: canUseMcp,
+  });
 
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [selectedToolForConfig, setSelectedToolForConfig] = useState<TPlugin | null>(null);
@@ -74,6 +95,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
   const { mcpValues, setMCPValues, isPinned, setIsPinned } = useMCPSelect({
     conversationId,
+    storageContextKey,
     servers: selectableServers,
   });
   const mcpValuesRef = useRef(mcpValues);
@@ -95,8 +117,20 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
   const cancelOAuthMutation = useCancelMCPOAuthMutation();
 
   const updateUserPluginsMutation = useUpdateUserPluginsMutation({
-    onSuccess: async () => {
-      showToast({ message: localize('com_nav_mcp_vars_updated'), status: 'success' });
+    onSuccess: async (_data, variables) => {
+      const isRevoke = variables.action === 'uninstall';
+      const message = isRevoke
+        ? localize('com_nav_mcp_access_revoked')
+        : localize('com_nav_mcp_vars_updated');
+      showToast({ message, status: 'success' });
+
+      /** Deselect server from mcpValues when revoking access */
+      if (isRevoke && variables.pluginKey?.startsWith(Constants.mcp_prefix)) {
+        const serverName = variables.pluginKey.replace(Constants.mcp_prefix, '');
+        const currentValues = mcpValuesRef.current ?? [];
+        const filteredValues = currentValues.filter((name) => name !== serverName);
+        setMCPValues(filteredValues);
+      }
 
       await Promise.all([
         queryClient.invalidateQueries([QueryKeys.mcpServers]),
@@ -114,61 +148,53 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     },
   });
 
-  const [serverStates, setServerStates] = useState<Record<string, ServerState>>(() => {
-    const initialStates: Record<string, ServerState> = {};
-    availableMCPServers.forEach((server) => {
-      initialStates[server.serverName] = {
-        isInitializing: false,
-        oauthUrl: null,
-        oauthStartTime: null,
-        isCancellable: false,
-        pollInterval: null,
-      };
-    });
-    return initialStates;
-  });
+  // Global atom for init states - shared across all useMCPServerManager instances
+  // This enables canceling OAuth from both chat dropdown and settings panel
+  const [serverInitStates, setServerInitStates] = useAtom(mcpServerInitStatesAtom);
+
+  // Poll intervals are kept local (not serializable)
+  const pollIntervalsRef = useRef<PollIntervals>({});
 
   const { connectionStatus } = useMCPConnectionStatus({
     enabled: !isLoading && availableMCPServers.length > 0,
   });
 
-  const updateServerState = useCallback((serverName: string, updates: Partial<ServerState>) => {
-    setServerStates((prev) => {
-      const newStates = { ...prev };
-      const currentState = newStates[serverName] || {
-        isInitializing: false,
-        oauthUrl: null,
-        oauthStartTime: null,
-        isCancellable: false,
-        pollInterval: null,
-      };
-      newStates[serverName] = { ...currentState, ...updates };
-      return newStates;
-    });
-  }, []);
+  const updateServerInitState = useCallback(
+    (serverName: string, updates: Partial<MCPServerInitState>) => {
+      setServerInitStates((prev) => {
+        const currentState = getServerInitState(prev, serverName);
+        return {
+          ...prev,
+          [serverName]: { ...currentState, ...updates },
+        };
+      });
+    },
+    [setServerInitStates],
+  );
 
   const cleanupServerState = useCallback(
     (serverName: string) => {
-      const state = serverStates[serverName];
-      if (state?.pollInterval) {
-        clearTimeout(state.pollInterval);
+      // Clear local poll interval
+      const pollInterval = pollIntervalsRef.current[serverName];
+      if (pollInterval) {
+        clearTimeout(pollInterval);
+        pollIntervalsRef.current[serverName] = null;
       }
-      updateServerState(serverName, {
+      // Reset global init state
+      updateServerInitState(serverName, {
         isInitializing: false,
         oauthUrl: null,
         oauthStartTime: null,
         isCancellable: false,
-        pollInterval: null,
       });
     },
-    [serverStates, updateServerState],
+    [updateServerInitState],
   );
 
   const startServerPolling = useCallback(
     (serverName: string) => {
       // Prevent duplicate polling for the same server
-      const existingState = serverStates[serverName];
-      if (existingState?.pollInterval) {
+      if (pollIntervalsRef.current[serverName]) {
         console.debug(`[MCP Manager] Polling already active for ${serverName}, skipping duplicate`);
         return;
       }
@@ -176,29 +202,39 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
       let pollAttempts = 0;
       let timeoutId: NodeJS.Timeout | null = null;
 
-      /** OAuth typically completes in 5 seconds to 3 minutes
-       * We enforce a strict 3-minute timeout with gradual backoff
+      /** OAuth can take several minutes if the user steps away from the consent screen.
+       * Poll for the full server-side handling window (MCP_OAUTH_HANDLING_TIMEOUT
+       * default = 10 minutes) with gradual backoff, so the button stays usable as long
+       * as the server will accept the callback.
        */
       const getPollInterval = (attempt: number): number => {
         if (attempt < 12) return 5000; // First minute: every 5s (12 polls)
         if (attempt < 22) return 6000; // Second minute: every 6s (10 polls)
-        return 7500; // Final minute: every 7.5s (8 polls)
+        return 7500; // Thereafter: every 7.5s
       };
 
-      const maxAttempts = 30; // Exactly 3 minutes (180 seconds) total
-      const OAUTH_TIMEOUT_MS = 180000; // 3 minutes in milliseconds
+      /** Honor the server's configured MCP_OAUTH_HANDLING_TIMEOUT (surfaced on the
+       * connection-status response) so a tuned deadline isn't capped at the default.
+       * The cache may be empty at start, so this is refreshed from the first status
+       * refetch below rather than captured once. */
+      const connectionData = queryClient.getQueryData<MCPConnectionStatusResponse>([
+        QueryKeys.mcpConnectionStatus,
+      ]);
+      let oauthTimeoutMs = connectionData?.oauthTimeout ?? 600000; // default 10 minutes
+      // Backstop only; the elapsed-time guard governs. Sized above the worst-case poll count.
+      let maxAttempts = Math.ceil(oauthTimeoutMs / 5000) + 5;
 
       const pollOnce = async () => {
         try {
           pollAttempts++;
-          const state = serverStates[serverName];
+          const state = getServerInitState(serverInitStates, serverName);
 
-          /** Stop polling after 3 minutes or max attempts */
+          /** Stop polling once the handling window or max attempts is exceeded */
           const elapsedTime = state?.oauthStartTime
             ? Date.now() - state.oauthStartTime
             : pollAttempts * 5000; // Rough estimate if no start time
 
-          if (pollAttempts > maxAttempts || elapsedTime > OAUTH_TIMEOUT_MS) {
+          if (pollAttempts > maxAttempts || elapsedTime > oauthTimeoutMs) {
             console.warn(
               `[MCP Manager] OAuth timeout for ${serverName} after ${(elapsedTime / 1000).toFixed(0)}s (attempt ${pollAttempts})`,
             );
@@ -215,9 +251,15 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
           await queryClient.refetchQueries([QueryKeys.mcpConnectionStatus]);
 
-          const freshConnectionData = queryClient.getQueryData([
+          const freshConnectionData = queryClient.getQueryData<MCPConnectionStatusResponse>([
             QueryKeys.mcpConnectionStatus,
-          ]) as any;
+          ]);
+          // Pick up the configured timeout once the status response lands (cache may have
+          // been empty when polling started), so a tuned deadline is honored mid-flight.
+          if (typeof freshConnectionData?.oauthTimeout === 'number') {
+            oauthTimeoutMs = freshConnectionData.oauthTimeout;
+            maxAttempts = Math.ceil(oauthTimeoutMs / 5000) + 5;
+          }
           const freshConnectionStatus = freshConnectionData?.connectionStatus || {};
 
           const serverStatus = freshConnectionStatus[serverName];
@@ -248,7 +290,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
           }
 
           // Check for OAuth timeout (should align with maxAttempts)
-          if (state?.oauthStartTime && Date.now() - state.oauthStartTime > OAUTH_TIMEOUT_MS) {
+          if (state?.oauthStartTime && Date.now() - state.oauthStartTime > oauthTimeoutMs) {
             showToast({
               message: localize('com_ui_mcp_oauth_timeout', { 0: serverName }),
               status: 'error',
@@ -283,7 +325,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
           }
 
           timeoutId = setTimeout(pollOnce, nextInterval);
-          updateServerState(serverName, { pollInterval: timeoutId });
+          pollIntervalsRef.current[serverName] = timeoutId;
         } catch (error) {
           console.error(`[MCP Manager] Error polling server ${serverName}:`, error);
           if (timeoutId) {
@@ -296,22 +338,14 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
       // Start the first poll
       timeoutId = setTimeout(pollOnce, getPollInterval(0));
-      updateServerState(serverName, { pollInterval: timeoutId });
+      pollIntervalsRef.current[serverName] = timeoutId;
     },
-    [
-      queryClient,
-      serverStates,
-      showToast,
-      localize,
-      setMCPValues,
-      cleanupServerState,
-      updateServerState,
-    ],
+    [queryClient, serverInitStates, showToast, localize, setMCPValues, cleanupServerState],
   );
 
   const initializeServer = useCallback(
     async (serverName: string, autoOpenOAuth: boolean = true) => {
-      updateServerState(serverName, { isInitializing: true });
+      updateServerInitState(serverName, { isInitializing: true });
       try {
         const response = await reinitializeMutation.mutateAsync(serverName);
         if (!response.success) {
@@ -324,7 +358,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         }
 
         if (response.oauthRequired && response.oauthUrl) {
-          updateServerState(serverName, {
+          updateServerInitState(serverName, {
             oauthUrl: response.oauthUrl,
             oauthStartTime: Date.now(),
             isCancellable: true,
@@ -367,7 +401,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
       }
     },
     [
-      updateServerState,
+      updateServerInitState,
       reinitializeMutation,
       startServerPolling,
       queryClient,
@@ -410,55 +444,28 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
   const isInitializing = useCallback(
     (serverName: string) => {
-      return serverStates[serverName]?.isInitializing || false;
+      return getServerInitState(serverInitStates, serverName).isInitializing;
     },
-    [serverStates],
+    [serverInitStates],
   );
 
   const isCancellable = useCallback(
     (serverName: string) => {
-      return serverStates[serverName]?.isCancellable || false;
+      return getServerInitState(serverInitStates, serverName).isCancellable;
     },
-    [serverStates],
+    [serverInitStates],
   );
 
   const getOAuthUrl = useCallback(
     (serverName: string) => {
-      return serverStates[serverName]?.oauthUrl || null;
+      return getServerInitState(serverInitStates, serverName).oauthUrl;
     },
-    [serverStates],
+    [serverInitStates],
   );
 
   const placeholderText = useMemo(
     () => startupConfig?.interface?.mcpServers?.placeholder || localize('com_ui_mcp_servers'),
     [startupConfig?.interface?.mcpServers?.placeholder, localize],
-  );
-
-  const batchToggleServers = useCallback(
-    (serverNames: string[]) => {
-      const connectedServers: string[] = [];
-      const disconnectedServers: string[] = [];
-
-      serverNames.forEach((serverName) => {
-        if (isInitializing(serverName)) {
-          return;
-        }
-
-        const serverStatus = connectionStatus?.[serverName];
-        if (serverStatus?.connectionState === 'connected') {
-          connectedServers.push(serverName);
-        } else {
-          disconnectedServers.push(serverName);
-        }
-      });
-
-      setMCPValues(connectedServers);
-
-      disconnectedServers.forEach((serverName) => {
-        initializeServer(serverName);
-      });
-    },
-    [connectionStatus, setMCPValues, initializeServer, isInitializing],
   );
 
   const toggleServerSelection = useCallback(
@@ -474,15 +481,10 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         const filteredValues = currentValues.filter((name) => name !== serverName);
         setMCPValues(filteredValues);
       } else {
-        const serverStatus = connectionStatus?.[serverName];
-        if (serverStatus?.connectionState === 'connected') {
-          setMCPValues([...currentValues, serverName]);
-        } else {
-          initializeServer(serverName);
-        }
+        setMCPValues([...currentValues, serverName]);
       }
     },
-    [mcpValues, setMCPValues, connectionStatus, initializeServer, isInitializing],
+    [mcpValues, setMCPValues, isInitializing],
   );
 
   const handleConfigSave = useCallback(
@@ -508,13 +510,10 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
           auth: {},
         };
         updateUserPluginsMutation.mutate(payload);
-
-        const currentValues = mcpValues ?? [];
-        const filteredValues = currentValues.filter((name) => name !== targetName);
-        setMCPValues(filteredValues);
+        /** Deselection is now handled centrally in updateUserPluginsMutation.onSuccess */
       }
     },
-    [selectedToolForConfig, updateUserPluginsMutation, mcpValues, setMCPValues],
+    [selectedToolForConfig, updateUserPluginsMutation],
   );
 
   /** Standalone revoke function for OAuth servers - doesn't require selectedToolForConfig */
@@ -584,6 +583,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
                   authField: key,
                   label: config.title,
                   description: config.description,
+                  sensitive: config.sensitive,
                 }))
               : []),
           authenticated: serverData?.authenticated ?? false,
@@ -600,6 +600,9 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
       const hasCustomUserVars =
         serverConfig?.customUserVars && Object.keys(serverConfig.customUserVars).length > 0;
+      const hasPendingOAuth =
+        serverStatus?.requiresOAuth === true && serverStatus.connectionState === 'connecting';
+      const canCancelOAuth = isCancellable(serverName) || hasPendingOAuth;
 
       return {
         serverName,
@@ -613,8 +616,8 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
             } as TPlugin)
           : undefined,
         onConfigClick: handleConfigClick,
-        isInitializing: isInitializing(serverName),
-        canCancel: isCancellable(serverName),
+        isInitializing: isInitializing(serverName) || hasPendingOAuth,
+        canCancel: canCancelOAuth,
         onCancel: handleCancelClick,
         hasCustomUserVars,
       };
@@ -631,6 +634,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         fieldsSchema[field.authField] = {
           title: field.label || field.authField,
           description: field.description,
+          sensitive: field.sensitive,
         };
       });
     }
@@ -681,7 +685,6 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     isPinned,
     setIsPinned,
     placeholderText,
-    batchToggleServers,
     toggleServerSelection,
     localize,
 

@@ -1,26 +1,18 @@
 const mongoose = require('mongoose');
-const { setAuthTokens } = require('~/server/services/AuthService');
+const { logger } = require('@librechat/data-schemas');
 const { storeAIPassTokens } = require('./tokenService');
-const { checkBan } = require('~/server/middleware');
-
-const domains = {
-  client: process.env.DOMAIN_CLIENT,
-  server: process.env.DOMAIN_SERVER,
-};
 
 /**
- * AIPass OAuth handler - stores tokens and sets LibreChat session
+ * Persist AIPass provider tokens before LibreChat creates its own session.
+ * Session creation and redirects remain in LibreChat's shared OAuth handler.
  */
 async function aipassOauthHandler(req, res, next) {
   try {
     if (res.headersSent) return;
 
-    await checkBan(req, res);
-    if (req.banned) return;
-
     const user = req.user;
     if (!user) {
-      return res.redirect(`${domains.client}/login?error=auth_failed`);
+      return next(new Error('AIPass authentication completed without a user.'));
     }
 
     // Store AIPass tokens (encrypted) for later API use
@@ -31,13 +23,13 @@ async function aipassOauthHandler(req, res, next) {
           refreshToken: user.federatedTokens.refresh_token,
           expiresIn: user.federatedTokens.expires_in || 3600,
         });
-      } catch {
-        // Continue with login even if token storage fails
+      } catch (error) {
+        logger.error('[AIPass OAuth] Failed to store provider tokens', error);
+        return next(error);
       }
     }
 
-    await setAuthTokens(user._id, res);
-    res.redirect(domains.client);
+    next();
   } catch (error) {
     next(error);
   }

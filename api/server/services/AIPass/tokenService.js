@@ -1,6 +1,10 @@
 const { encryptV2, decryptV2 } = require('@librechat/data-schemas');
 
-const AIPASS_BASE_URL = process.env.AIPASS_ISSUER || 'https://aipass.one';
+const AIPASS_BASE_URL = (
+  process.env.AIPASS_BASE_URL ||
+  process.env.AIPASS_ISSUER ||
+  'https://aipass.one'
+).replace(/\/+$/, '');
 const TOKEN_REFRESH_BUFFER = 5 * 60 * 1000; // 5 minutes before expiry
 
 /**
@@ -14,7 +18,15 @@ async function storeAIPassTokens(mongoose, userId, { accessToken, refreshToken, 
 
   return User.findByIdAndUpdate(
     userId,
-    { $set: { aipassTokens: { accessToken: encryptedAccessToken, refreshToken: encryptedRefreshToken, expiresAt } } },
+    {
+      $set: {
+        aipassTokens: {
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          expiresAt,
+        },
+      },
+    },
     { new: true, runValidators: true },
   ).lean();
 }

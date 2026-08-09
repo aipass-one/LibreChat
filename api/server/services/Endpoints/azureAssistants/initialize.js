@@ -1,10 +1,10 @@
 const OpenAI = require('openai');
-const { ProxyAgent } = require('undici');
 const {
   isUserProvided,
   resolveHeaders,
   constructAzureURL,
   checkUserKeyExpiry,
+  getProxyDispatcher,
 } = require('@librechat/api');
 const { ErrorTypes, EModelEndpoint, mapModelToAzureConfig } = require('librechat-data-provider');
 const { getUserKeyValues, getUserKeyExpiry } = require('~/models');
@@ -128,7 +128,6 @@ const initializeClient = async ({ req, res, version, endpointOption, initAppClie
       const groupName = modelGroupMap[modelName].group;
       clientOptions.addParams = azureConfig.groupMap[groupName].addParams;
       clientOptions.dropParams = azureConfig.groupMap[groupName].dropParams;
-      clientOptions.forcePrompt = azureConfig.groupMap[groupName].forcePrompt;
 
       clientOptions.reverseProxyUrl = baseURL ?? clientOptions.reverseProxyUrl;
       clientOptions.headers = opts.defaultHeaders;
@@ -158,10 +157,10 @@ const initializeClient = async ({ req, res, version, endpointOption, initAppClie
     opts.baseURL = baseURL;
   }
 
-  if (PROXY) {
-    const proxyAgent = new ProxyAgent(PROXY);
+  const proxyDispatcher = getProxyDispatcher(PROXY);
+  if (proxyDispatcher) {
     opts.fetchOptions = {
-      dispatcher: proxyAgent,
+      dispatcher: proxyDispatcher,
     };
   }
 

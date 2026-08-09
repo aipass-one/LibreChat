@@ -1,11 +1,22 @@
-const { z } = require('zod');
 const axios = require('axios');
-const { tool } = require('@langchain/core/tools');
 const { logger } = require('@librechat/data-schemas');
+const { tool } = require('@librechat/agents/langchain/tools');
 const { generateShortLivedToken } = require('@librechat/api');
 const { Tools, EToolResources } = require('librechat-data-provider');
 const { filterFilesByAgentAccess } = require('~/server/services/Files/permissions');
 const { getFiles } = require('~/models');
+
+const fileSearchJsonSchema = {
+  type: 'object',
+  properties: {
+    query: {
+      type: 'string',
+      description:
+        "A natural language query to search for relevant information in the files. Be specific and use keywords related to the information you're looking for. The query will be used for semantic similarity matching against the file contents.",
+    },
+  },
+  required: ['query'],
+};
 
 /**
  *
@@ -14,7 +25,7 @@ const { getFiles } = require('~/models');
  * @param {Agent['tool_resources']} options.tool_resources
  * @param {string} [options.agentId] - The agent ID for file access control
  * @returns {Promise<{
- *   files: Array<{ file_id: string; filename: string }>,
+ *   files: Array<{ file_id: string; filename: string; fromAgent: boolean }>,
  *   toolContext: string
  * }>}
  */
@@ -59,6 +70,7 @@ const primeFiles = async (options) => {
     files.push({
       file_id: file.file_id,
       filename: file.filename,
+      fromAgent: agentResourceIds.has(file.file_id),
     });
   }
 
@@ -69,7 +81,7 @@ const primeFiles = async (options) => {
  *
  * @param {Object} options
  * @param {string} options.userId
- * @param {Array<{ file_id: string; filename: string }>} options.files
+ * @param {Array<{ file_id: string; filename: string; fromAgent?: boolean }>} options.files
  * @param {string} [options.entity_id]
  * @param {boolean} [options.fileCitations=false] - Whether to include citation instructions
  * @returns
@@ -86,7 +98,7 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
       }
 
       /**
-       * @param {import('librechat-data-provider').TFile} file
+       * @param {import('librechat-data-provider').TFile & { fromAgent?: boolean }} file
        * @returns {{ file_id: string, query: string, k: number, entity_id?: string }}
        */
       const createQueryBody = (file) => {
@@ -95,7 +107,14 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
           query,
           k: 5,
         };
-        if (!entity_id) {
+        // User-attached files are embedded under the user id (no entity);
+        // only agent knowledge-base files carry the agent's entity_id.
+        // Sending entity_id for user attachments makes the RAG API's entity
+        // filter return no results for them. When files are provided by
+        // primeFiles, fromAgent is always set; for callers that pass files
+        // directly without the flag, the safe default is unscoped (no
+        // entity_id).
+        if (!entity_id || file.fromAgent !== true) {
           return body;
         }
         body.entity_id = entity_id;
@@ -182,15 +201,9 @@ Use the EXACT anchor markers shown below (copy them verbatim) immediately after 
 **ALWAYS mention the filename in your text before the citation marker. NEVER use markdown links or footnotes.**`
           : ''
       }`,
-      schema: z.object({
-        query: z
-          .string()
-          .describe(
-            "A natural language query to search for relevant information in the files. Be specific and use keywords related to the information you're looking for. The query will be used for semantic similarity matching against the file contents.",
-          ),
-      }),
+      schema: fileSearchJsonSchema,
     },
   );
 };
 
-module.exports = { createFileSearchTool, primeFiles };
+module.exports = { createFileSearchTool, primeFiles, fileSearchJsonSchema };
