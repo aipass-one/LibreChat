@@ -116,7 +116,11 @@ export default function ChatRoute() {
 
   const modelsQuery = useGetModelsQuery({
     enabled: isAuthenticated,
+    refetchInterval: 60_000,
+    refetchOnReconnect: true,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
   });
   const initialConvoQuery = useGetConvoIdQuery(conversationId, {
     enabled:
