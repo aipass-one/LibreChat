@@ -29,9 +29,7 @@ import { isUserProvided } from '~/utils';
  * promise, otherwise the first endpoint's filtered /models response would
  * be reused for the other in the same request.
  */
-function objectFingerprint(
-  value: Record<string, string | number | boolean> | undefined,
-): string {
+function objectFingerprint(value: Record<string, string | number | boolean> | undefined): string {
   if (!value || Object.keys(value).length === 0) {
     return '';
   }
@@ -194,7 +192,11 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
 
       if (models?.fetch && usesAIPassOAuth) {
         const userId = req.user?.id;
-        const aipassToken = userId && getAIPassToken ? await getAIPassToken({ userId }) : null;
+        if (!userId || !getAIPassToken) {
+          continue;
+        }
+
+        const aipassToken = await getAIPassToken({ userId });
         if (!aipassToken) {
           continue;
         }
