@@ -28,7 +28,7 @@ describe('createLoadConfigModels – AIPass OAuth catalog', () => {
       [EModelEndpoint.custom]: [
         {
           name: 'AIPass',
-          baseURL: 'https://aipass.one/oauth2/v1',
+          baseURL: 'https://aipass.one/v1',
           apiKey: AuthType.AIPASS_OAUTH,
           models: {
             fetch: true,
@@ -65,7 +65,7 @@ describe('createLoadConfigModels – AIPass OAuth catalog', () => {
     expect(fetchModels).toHaveBeenCalledWith(
       expect.objectContaining({
         apiKey: 'aipass-access-token',
-        baseURL: 'https://aipass.one/oauth2/v1',
+        baseURL: 'https://aipass.one/v1',
         queryParams: { type: 'text', method: 'chat_completions' },
         skipCache: true,
       }),

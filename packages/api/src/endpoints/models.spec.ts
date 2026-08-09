@@ -114,7 +114,7 @@ describe('fetchModels', () => {
   it('appends configured model-catalog filters', async () => {
     await fetchModels({
       apiKey: 'aipass-token',
-      baseURL: 'https://aipass.one/oauth2/v1',
+      baseURL: 'https://aipass.one/v1',
       name: 'AIPass',
       queryParams: {
         type: 'text',
@@ -123,7 +123,7 @@ describe('fetchModels', () => {
     });
 
     expect(mockedAxios.get).toHaveBeenCalledWith(
-      'https://aipass.one/oauth2/v1/models?type=text&method=chat_completions',
+      'https://aipass.one/v1/models?type=text&method=chat_completions',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer aipass-token' }),
       }),

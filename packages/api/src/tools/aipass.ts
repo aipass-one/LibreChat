@@ -2,7 +2,7 @@ import { AuthType } from 'librechat-data-provider';
 import { fetchModels } from '~/endpoints/models';
 import type { FetchModelsParams } from '~/endpoints/models';
 
-export const AIPASS_API_BASE_URL = 'https://aipass.one/oauth2/v1';
+export const AIPASS_API_BASE_URL = 'https://aipass.one/v1';
 export const AIPASS_DEFAULT_IMAGE_GENERATION_MODEL = 'nano-banana-2';
 export const AIPASS_DEFAULT_IMAGE_EDIT_MODEL = 'nano-banana-2-edit';
 

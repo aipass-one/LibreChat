@@ -182,7 +182,7 @@ describe('OpenAIImageTools - IMAGE_GEN_OAI_MODEL environment variable', () => {
       req: { user: { id: 'test-user' } },
       usesAIPassOAuth: true,
       IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
-      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/oauth2/v1',
+      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/v1',
       imageGenerationModels: ['nano-banana-2', 'imagen-4-ultra'],
     });
 
@@ -249,7 +249,7 @@ describe('OpenAIImageTools - IMAGE_GEN_OAI_MODEL environment variable', () => {
       isAgent: true,
       req: { user: { id: 'test-user' } },
       IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
-      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/oauth2/v1',
+      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/v1',
     });
 
     await imageGenTool.func({ prompt: 'a mountain' });
@@ -257,7 +257,7 @@ describe('OpenAIImageTools - IMAGE_GEN_OAI_MODEL environment variable', () => {
     expect(OpenAI).toHaveBeenCalledWith(
       expect.objectContaining({
         apiKey: 'user-oauth-token',
-        baseURL: 'https://aipass.one/oauth2/v1',
+        baseURL: 'https://aipass.one/v1',
       }),
     );
   });
@@ -276,7 +276,7 @@ describe('OpenAIImageTools - IMAGE_GEN_OAI_MODEL environment variable', () => {
       req: { user: { id: 'test-user' } },
       usesAIPassOAuth: true,
       IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
-      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/oauth2/v1',
+      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/v1',
       imageEditModels: ['gpt-image-2-edit', 'nano-banana-2-edit'],
       imageFiles: [
         {
