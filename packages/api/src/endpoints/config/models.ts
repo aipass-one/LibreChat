@@ -217,6 +217,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
           userIdQuery: models.userIdQuery,
           queryParams: models.queryParams,
           skipCache: true,
+          staleCacheScope: `aipass:${userId}:${name}`,
           tokenKey,
         });
         uniqueKeyToEndpointsMap[aipassFetchKey] = [name];

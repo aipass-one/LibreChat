@@ -1068,6 +1068,39 @@ describe('fetchModels caching behavior', () => {
     expect(mockCacheSet).not.toHaveBeenCalled();
   });
 
+  it('uses a user-scoped last known catalog when a live fetch fails', async () => {
+    mockCacheGet.mockResolvedValue(['last-known-model']);
+    mockedAxios.get.mockRejectedValue(new Error('temporary upstream outage'));
+
+    const models = await fetchModels({
+      apiKey: 'rotating-user-token',
+      baseURL: 'https://aipass.one/v1',
+      name: 'AIPass',
+      skipCache: true,
+      staleCacheScope: 'aipass:user-1:AIPass',
+    });
+
+    expect(models).toEqual(['last-known-model']);
+    expect(mockCacheGet).toHaveBeenCalledTimes(1);
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it('retains a successful user-scoped catalog for one day', async () => {
+    await fetchModels({
+      apiKey: 'rotating-user-token',
+      baseURL: 'https://aipass.one/v1',
+      name: 'AIPass',
+      skipCache: true,
+      staleCacheScope: 'aipass:user-1:AIPass',
+    });
+
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      expect.any(String),
+      ['cached-model-1', 'cached-model-2'],
+      Time.ONE_DAY,
+    );
+  });
+
   it('does not write to cache when fetch returns empty models', async () => {
     mockedAxios.get.mockResolvedValue({ data: { data: [] } });
 

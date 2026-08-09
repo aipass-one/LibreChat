@@ -19,6 +19,9 @@ Keep the AI Pass endpoint's `models.fetch` setting enabled and avoid pinning the
 `modelSpecs`. Model specs are static shortcuts; leaving an old curated list there makes removed
 models look current and hides new catalog entries behind an extra selector level. A short
 `models.default` list may remain only as a temporary fallback when discovery is unavailable.
+The client refreshes the catalog every minute and on focus/reconnect. LibreChat retains each
+user's last successful AI Pass catalog for one day, so a brief AI Pass deployment does not collapse
+the selector to the static fallback.
 
 ## Remaining balance
 

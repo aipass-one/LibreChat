@@ -68,6 +68,7 @@ describe('createLoadConfigModels – AIPass OAuth catalog', () => {
         baseURL: 'https://aipass.one/v1',
         queryParams: { type: 'text', method: 'chat_completions' },
         skipCache: true,
+        staleCacheScope: 'aipass:user-1:AIPass',
       }),
     );
   });

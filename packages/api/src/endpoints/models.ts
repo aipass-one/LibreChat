@@ -57,6 +57,12 @@ export interface FetchModelsParams {
   userObject?: Partial<IUser>;
   /** Skip MODEL_QUERIES cache (e.g., for user-provided keys) */
   skipCache?: boolean;
+  /**
+   * Opaque, caller-scoped key used to retain the last successful catalog.
+   * Unlike the short-lived request cache, this value is only used when the
+   * live model request returns no models.
+   */
+  staleCacheScope?: string;
 }
 
 function applyUserProvidedBaseURLProtection(
@@ -168,6 +174,7 @@ export async function fetchModels({
   headers,
   userObject,
   skipCache = false,
+  staleCacheScope,
 }: FetchModelsParams): Promise<string[]> {
   let models: string[] = [];
   const baseURL = direct ? extractBaseURL(_baseURL ?? '') : _baseURL;
@@ -197,6 +204,13 @@ export async function fetchModels({
   const shouldCache = !skipCache && !(userIdQuery && user) && !hasUserScopedHeaders;
   const cacheKey = shouldCache ? modelsCacheKey(baseURL ?? '', apiKey, queryParams) : '';
   const modelsCache = shouldCache ? standardCache(CacheKeys.MODEL_QUERIES) : null;
+  const staleCacheKey = staleCacheScope
+    ? modelsCacheKey(baseURL ?? '', `stale:${staleCacheScope}`, queryParams)
+    : '';
+  const staleModelsCache = staleCacheKey ? standardCache(CacheKeys.MODEL_QUERIES) : null;
+  const staleModels = staleModelsCache
+    ? ((await staleModelsCache.get(staleCacheKey)) as string[] | undefined)
+    : undefined;
   if (modelsCache && cacheKey) {
     const cachedModels = await modelsCache.get(cacheKey);
     if (cachedModels) {
@@ -306,6 +320,13 @@ export async function fetchModels({
   } catch (error) {
     const logMessage = `Failed to fetch models from ${azure ? 'Azure ' : ''}${name} API`;
     logAxiosError({ message: logMessage, error: error as Error });
+  }
+
+  if (models.length > 0 && staleModelsCache) {
+    await staleModelsCache.set(staleCacheKey, models, Time.ONE_DAY);
+  } else if (models.length === 0 && staleModels?.length) {
+    logger.warn(`[fetchModels] Using last known model catalog for ${name}`);
+    models = staleModels;
   }
 
   if (modelsCache && cacheKey && models.length > 0) {
