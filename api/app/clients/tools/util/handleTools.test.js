@@ -10,8 +10,15 @@ const mockGetMCPServerTools = jest.fn();
 const mockCreateMCPTool = jest.fn();
 const mockCreateMCPTools = jest.fn();
 const mockGetServerConfig = jest.fn();
+const mockGetAIPassToken = jest.fn();
+const mockGetRoleByName = jest.fn();
 
 jest.mock('~/server/services/PluginService', () => mockPluginService);
+
+jest.mock('~/models', () => ({
+  getAIPassToken: (...args) => mockGetAIPassToken(...args),
+  getRoleByName: (...args) => mockGetRoleByName(...args),
+}));
 
 jest.mock('~/server/services/Config', () => ({
   getAppConfig: jest.fn().mockResolvedValue({
@@ -120,6 +127,7 @@ describe('Tool Handlers', () => {
   beforeEach(async () => {
     // Clear mocks but not the database since we need the user to persist
     jest.clearAllMocks();
+    mockGetAIPassToken.mockResolvedValue('user-oauth-token');
 
     // Reset the mock implementations
     const userAuthValues = {};
@@ -302,6 +310,44 @@ describe('Tool Handlers', () => {
       const structuredTool = await toolFunctions['stable-diffusion']();
       expect(structuredTool).toBeInstanceOf(StructuredSD);
       delete process.env.SD_WEBUI_URL;
+    });
+
+    it('loads Gemini delegated web search for a non-Gemini AI Pass model', async () => {
+      const onSearchResults = jest.fn();
+      const toolMap = await loadTools({
+        user: fakeUser._id.toString(),
+        agent: { provider: 'AIPass', model: 'gpt-5.4-mini' },
+        tools: ['web_search'],
+        returnMap: true,
+        options: {
+          req: {
+            user: { id: fakeUser._id.toString(), role: 'USER' },
+            config: {
+              endpoints: {
+                custom: [
+                  {
+                    name: 'AIPass',
+                    apiKey: 'aipass_oauth',
+                    baseURL: 'https://aipass.one/v1',
+                    customParams: {
+                      nativeWebSearch: {
+                        modelPrefixes: ['gemini-'],
+                        searchModel: 'gemini-3.5-flash-lite',
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          web_search: { onSearchResults },
+        },
+      });
+
+      const searchTool = await toolMap.web_search();
+
+      expect(searchTool.name).toBe('web_search');
+      expect(mockGetAIPassToken).toHaveBeenCalledWith({ userId: fakeUser._id.toString() });
     });
 
     it('passes request body to chat MCP tool creation and skips stale cache for BODY-scoped servers', async () => {

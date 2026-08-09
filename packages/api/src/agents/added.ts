@@ -7,6 +7,7 @@ import {
   appendAgentIdSuffix,
   encodeEphemeralAgentId,
   getNativeWebSearchConfig,
+  getDelegatedWebSearchConfig,
 } from 'librechat-data-provider';
 import type { Agent, TConfig, TConversation, TModelSpec } from 'librechat-data-provider';
 import type { AppConfig } from '@librechat/data-schemas';
@@ -197,8 +198,9 @@ export async function loadAddedAgent(
   const webSearchSelected = ephemeralAgent?.web_search === true || modelSpec?.webSearch === true;
   const customParams = endpointConfig?.customParams as TConfig['customParams'];
   const nativeWebSearch = getNativeWebSearchConfig(customParams, model);
+  const delegatedWebSearch = getDelegatedWebSearchConfig(customParams, model);
   const endpointUsesNativeWebSearch = customParams?.nativeWebSearch != null;
-  if (webSearchSelected && !endpointUsesNativeWebSearch) {
+  if (webSearchSelected && (!endpointUsesNativeWebSearch || delegatedWebSearch)) {
     tools.push(Tools.web_search);
   }
 

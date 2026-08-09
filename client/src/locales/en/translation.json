@@ -1888,6 +1888,8 @@
   "com_ui_web_search_jina_url": "Jina API URL (optional)",
   "com_ui_web_search_native_price": "{{0}}/query",
   "com_ui_web_search_native_price_help": "Google Search grounding price; a prompt may use multiple queries",
+  "com_ui_web_search_delegated": "via {{0}}",
+  "com_ui_web_search_delegated_price_help": "{{0}} runs as a separate billed model call when the selected model uses this tool. Google Search costs {{1}}/query and one tool call may use multiple queries",
   "com_ui_web_search_processing": "Processing results",
   "com_ui_web_search_provider": "Search Provider",
   "com_ui_web_search_provider_searxng": "SearXNG",

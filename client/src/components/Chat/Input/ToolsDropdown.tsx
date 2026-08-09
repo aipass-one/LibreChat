@@ -179,10 +179,22 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
           <div className="flex items-center gap-2">
             <Globe className="icon-md" aria-hidden="true" />
             <span>{localize('com_ui_web_search')}</span>
+            {nativeWebSearch?.searchModel && (
+              <span className="text-xs text-text-secondary">
+                {localize('com_ui_web_search_delegated', { 0: nativeWebSearch.searchModel })}
+              </span>
+            )}
             {nativeWebSearch?.isAvailable && nativeWebSearch.pricePerQuery != null && (
               <span
                 className="text-xs text-text-secondary"
-                title={localize('com_ui_web_search_native_price_help')}
+                title={
+                  nativeWebSearch.searchModel
+                    ? localize('com_ui_web_search_delegated_price_help', {
+                        0: nativeWebSearch.searchModel,
+                        1: `$${nativeWebSearch.pricePerQuery.toFixed(3)}`,
+                      })
+                    : localize('com_ui_web_search_native_price_help')
+                }
               >
                 {localize('com_ui_web_search_native_price', {
                   0: `$${nativeWebSearch.pricePerQuery.toFixed(3)}`,
