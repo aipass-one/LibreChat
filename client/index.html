@@ -1,18 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en-US">
   <head>
     <meta charset="utf-8" />
     <base href="/" />
-    <meta name="theme-color" content="#171717" />
+    <meta name="theme-color" content="#4F46E5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="description" content="LibreChat - An open source chat application with support for multiple AI models" />
-    <title>LibreChat</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
-    <link rel="apple-touch-icon" href="assets/apple-touch-icon-180x180.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="AI Pass" />
+    <meta name="application-name" content="AI Pass" />
+    <meta name="description" content="AI Pass — One account for every AI model." />
+    <title>AI Pass</title>
+    <link rel="icon" type="image/svg+xml" href="assets/aipass-icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/aipass-icon-32.png" />
+    <link rel="apple-touch-icon" href="assets/aipass-icon-180.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
     <style>
       html,
       body {
@@ -25,28 +30,79 @@
       const theme = localStorage.getItem('color-theme');
       const loadingContainerStyle = document.createElement('style');
       let backgroundColor;
+      let foregroundColor;
+      let secondaryColor;
 
       if (theme === 'dark') {
         backgroundColor = '#0d0d0d';
+        foregroundColor = '#f7f7fb';
+        secondaryColor = '#a1a1aa';
       } else if (theme === 'light') {
-        backgroundColor = '#ffffff';
+        backgroundColor = '#f7f7fb';
+        foregroundColor = '#171717';
+        secondaryColor = '#71717a';
       } else if (theme === 'system') {
         const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        backgroundColor = prefersDarkScheme ? '#0d0d0d' : '#ffffff';
+        backgroundColor = prefersDarkScheme ? '#0d0d0d' : '#f7f7fb';
+        foregroundColor = prefersDarkScheme ? '#f7f7fb' : '#171717';
+        secondaryColor = prefersDarkScheme ? '#a1a1aa' : '#71717a';
       } else {
-        backgroundColor = '#ffffff';
+        backgroundColor = '#f7f7fb';
+        foregroundColor = '#171717';
+        secondaryColor = '#71717a';
       }
 
       loadingContainerStyle.innerHTML = `
         #loading-container {
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
+          gap: 10px;
           height: 100vh;
+          min-height: 100svh;
           background-color: ${backgroundColor};
+          color: ${foregroundColor};
+          font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        #aipass-loading-logo {
+          width: 76px;
+          height: 76px;
+          margin-bottom: 10px;
+          filter: drop-shadow(0 14px 24px rgba(79, 70, 229, 0.22));
+          animation: aipass-launch 1.4s ease-in-out infinite alternate;
+        }
+        #aipass-loading-name {
+          font-size: 24px;
+          font-weight: 750;
+          letter-spacing: -0.04em;
+        }
+        #aipass-loading-tagline {
+          color: ${secondaryColor};
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+        }
+        @keyframes aipass-launch {
+          from { transform: translateY(0) scale(1); opacity: 0.92; }
+          to { transform: translateY(-3px) scale(1.025); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          #aipass-loading-logo { animation: none; }
         }
       `;
       document.head.appendChild(loadingContainerStyle);
+    </script>
+    <script>
+      window.__aipassInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        window.__aipassInstallPrompt = event;
+        window.dispatchEvent(new CustomEvent('aipass-install-ready'));
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__aipassInstallPrompt = null;
+      });
     </script>
     <script>
       (function () {
@@ -137,7 +193,11 @@
   </head>
   <body>
     <div id="root">
-      <div id="loading-container"></div>
+      <div id="loading-container" role="status" aria-label="AI Pass is loading">
+        <img id="aipass-loading-logo" src="assets/aipass-icon.svg" alt="" />
+        <div id="aipass-loading-name">AI Pass</div>
+        <div id="aipass-loading-tagline">Every AI. One pass.</div>
+      </div>
     </div>
   </body>
 </html>

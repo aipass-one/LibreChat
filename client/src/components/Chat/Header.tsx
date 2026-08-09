@@ -9,6 +9,7 @@ import { OpenSidebar, PresetsMenu } from './Menus';
 import BookmarkMenu from './Menus/BookmarkMenu';
 import { TemporaryChat } from './TemporaryChat';
 import AddMultiConvo from './AddMultiConvo';
+import InstallAIPass from '~/components/PWA/InstallAIPass';
 import { useHasAccess } from '~/hooks';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -69,14 +70,17 @@ function Header() {
           )}
         </div>
 
-        {!isSmallScreen && (
-          <div className="flex items-center gap-2">
-            <ExportAndShareMenu
-              isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
-            />
-            {hasAccessToTemporaryChat === true && <TemporaryChat />}
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          <InstallAIPass />
+          {!isSmallScreen && (
+            <>
+              <ExportAndShareMenu
+                isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false}
+              />
+              {hasAccessToTemporaryChat === true && <TemporaryChat />}
+            </>
+          )}
+        </div>
       </div>
       {/* Empty div for spacing */}
       <div />
