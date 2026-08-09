@@ -324,19 +324,17 @@ describe('Tool Handlers', () => {
             user: { id: fakeUser._id.toString(), role: 'USER' },
             config: {
               endpoints: {
-                custom: [
-                  {
-                    name: 'AIPass',
-                    apiKey: 'aipass_oauth',
-                    baseURL: 'https://aipass.one/v1',
-                    customParams: {
-                      nativeWebSearch: {
-                        modelPrefixes: ['gemini-'],
-                        searchModel: 'gemini-3.5-flash-lite',
-                      },
+                AIPass: {
+                  name: 'AIPass',
+                  apiKey: 'aipass_oauth',
+                  baseURL: 'https://aipass.one/v1',
+                  customParams: {
+                    nativeWebSearch: {
+                      modelPrefixes: ['gemini-'],
+                      searchModel: 'gemini-3.5-flash-lite',
                     },
                   },
-                ],
+                },
               },
             },
           },
