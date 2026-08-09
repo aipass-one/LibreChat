@@ -31,6 +31,25 @@ export const useGetUserBalance = (
   });
 };
 
+export const useGetAIPassBalance = (
+  config?: UseQueryOptions<t.TAIPassBalanceResponse | undefined>,
+): QueryObserverResult<t.TAIPassBalanceResponse | undefined> => {
+  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  return useQuery<t.TAIPassBalanceResponse | undefined>(
+    [QueryKeys.aipassBalance],
+    () => dataService.getAIPassBalance(),
+    {
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchOnMount: true,
+      staleTime: 15_000,
+      ...config,
+      enabled: (config?.enabled ?? true) === true && queriesEnabled,
+    },
+  );
+};
+
 export const useGetSearchEnabledQuery = (
   config?: UseQueryOptions<boolean>,
 ): QueryObserverResult<boolean> => {

@@ -154,6 +154,10 @@ export function getUserBalance(): Promise<t.TBalanceResponse> {
   return request.get(endpoints.balance());
 }
 
+export function getAIPassBalance(): Promise<t.TAIPassBalanceResponse | undefined> {
+  return request.get(endpoints.aipassBalance());
+}
+
 export const updateTokenCount = (text: string) => {
   return request.post(endpoints.tokenizer(), { arg: text });
 };

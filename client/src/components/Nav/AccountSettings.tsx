@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { ArchivedChatsModal } from '~/components/Nav/SettingsTabs/General/ArchivedChatsModal';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
-import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
+import { useGetAIPassBalance, useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import Settings from './Settings';
@@ -99,6 +99,9 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const balanceQuery = useGetUserBalance({
     enabled: !!isAuthenticated && startupConfig?.balance?.enabled,
   });
+  const aipassBalanceQuery = useGetAIPassBalance({
+    enabled: !!isAuthenticated && startupConfig?.aipassLoginEnabled === true,
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   const setShowShortcutsDialog = useSetRecoilState(store.showShortcutsDialog);
@@ -145,6 +148,22 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
           {user?.email ?? localize('com_nav_user')}
         </div>
         <DropdownMenuSeparator />
+        {aipassBalanceQuery.data != null && (
+          <>
+            <div className="mx-3 flex items-center justify-between gap-3 py-2 text-sm" role="note">
+              <span className="text-text-secondary">{localize('com_nav_aipass_balance')}</span>
+              <span className="font-medium tabular-nums text-text-primary">
+                {new Intl.NumberFormat(undefined, {
+                  style: 'currency',
+                  currency: aipassBalanceQuery.data.currency,
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 4,
+                }).format(aipassBalanceQuery.data.remainingBudget)}
+              </span>
+            </div>
+            <DropdownMenuSeparator />
+          </>
+        )}
         {startupConfig?.balance?.enabled === true && balanceQuery.data != null && (
           <>
             <div className="text-token-text-secondary ml-3 mr-2 py-2 text-sm" role="note">

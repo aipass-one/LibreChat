@@ -36,8 +36,10 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const rum = require('./rum');
+const aipass = require('./aipass');
 
 module.exports = {
+  aipass,
   rum,
   mcp,
   auth,

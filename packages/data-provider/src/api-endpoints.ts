@@ -44,6 +44,7 @@ export const health = () => `${BASE_URL}/health`;
 export const user = () => `${BASE_URL}/api/user`;
 
 export const balance = () => `${BASE_URL}/api/balance`;
+export const aipassBalance = () => `${BASE_URL}/api/aipass/balance`;
 
 export const userPlugins = () => `${BASE_URL}/api/user/plugins`;
 
