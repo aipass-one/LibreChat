@@ -387,6 +387,7 @@ const createResponse = async (req, res) => {
       listSkillsByAccess: skillDbMethods.listSkillsByAccess,
       listAlwaysApplySkills: skillDbMethods.listAlwaysApplySkills,
       getSkillByName: skillDbMethods.getSkillByName,
+      getAIPassToken: db.getAIPassToken,
     };
 
     const enabledCapabilities = new Set(

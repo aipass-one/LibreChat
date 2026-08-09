@@ -100,6 +100,8 @@ afterEach(() => {
   delete process.env.SAML_ISSUER;
   delete process.env.SAML_CERT;
   delete process.env.SAML_SESSION_SECRET;
+  delete process.env.AIPASS_CLIENT_ID;
+  delete process.env.AIPASS_AUTO_REDIRECT;
   delete process.env.ALLOW_ACCOUNT_DELETION;
   delete process.env.ANALYTICS_GTM_ID;
   delete process.env.CUSTOM_FOOTER;
@@ -213,6 +215,28 @@ describe('GET /api/config', () => {
 
       expect(response.body.socialLogins).toEqual(['google', 'github']);
       expect(response.body.turnstile).toEqual({ siteKey: 'test-key' });
+    });
+
+    it('should expose AIPass login settings before authentication', async () => {
+      process.env.AIPASS_CLIENT_ID = 'chat-client';
+      process.env.AIPASS_AUTO_REDIRECT = 'true';
+      mockGetAppConfig.mockResolvedValue({
+        ...baseAppConfig,
+        registration: { socialLogins: ['aipass'] },
+      });
+      const app = createApp(null);
+
+      const response = await request(app).get('/api/config');
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          aipassLoginEnabled: true,
+          aipassLabel: 'Continue with AIPass',
+          aipassAutoRedirect: true,
+          socialLogins: ['aipass'],
+        }),
+      );
     });
 
     it('should include only privacyPolicy and termsOfService from interface config', async () => {

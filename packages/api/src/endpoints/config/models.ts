@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { logger } from '@librechat/data-schemas';
 import {
+  AuthType,
   ErrorTypes,
   EModelEndpoint,
   extractEnvVariable,
@@ -8,7 +9,12 @@ import {
 } from 'librechat-data-provider';
 import type { TModelsConfig, TEndpoint } from 'librechat-data-provider';
 import type { AppConfig } from '@librechat/data-schemas';
-import type { ServerRequest, GetUserKeyValuesFunction, UserKeyValues } from '~/types';
+import type {
+  ServerRequest,
+  GetAIPassTokenFunction,
+  GetUserKeyValuesFunction,
+  UserKeyValues,
+} from '~/types';
 import type { FetchModelsParams } from '~/endpoints/models';
 import { fetchModels as defaultFetchModels } from '~/endpoints/models';
 import { getTokenConfigKey } from '~/endpoints/custom/initialize';
@@ -23,13 +29,15 @@ import { isUserProvided } from '~/utils';
  * promise, otherwise the first endpoint's filtered /models response would
  * be reused for the other in the same request.
  */
-function headersFingerprint(headers: Record<string, string> | undefined): string {
-  if (!headers || Object.keys(headers).length === 0) {
+function objectFingerprint(
+  value: Record<string, string | number | boolean> | undefined,
+): string {
+  if (!value || Object.keys(value).length === 0) {
     return '';
   }
-  const ordered = Object.keys(headers)
+  const ordered = Object.keys(value)
     .sort()
-    .map((k) => [k, headers[k]]);
+    .map((key) => [key, value[key]]);
   return crypto.createHash('sha256').update(JSON.stringify(ordered)).digest('hex').slice(0, 16);
 }
 
@@ -40,6 +48,7 @@ interface ResolvedEndpoint {
   baseURL: string;
   apiKeyIsUserProvided: boolean;
   baseURLIsUserProvided: boolean;
+  usesAIPassOAuth: boolean;
 }
 
 export interface LoadConfigModelsDeps {
@@ -49,11 +58,12 @@ export interface LoadConfigModelsDeps {
     tenantId?: string;
   }) => Promise<AppConfig>;
   getUserKeyValues: GetUserKeyValuesFunction;
+  getAIPassToken?: GetAIPassTokenFunction;
   fetchModels?: (params: FetchModelsParams) => Promise<string[]>;
 }
 
 export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
-  const { getAppConfig, getUserKeyValues, fetchModels = defaultFetchModels } = deps;
+  const { getAppConfig, getUserKeyValues, getAIPassToken, fetchModels = defaultFetchModels } = deps;
 
   return async function loadConfigModels(req: ServerRequest): Promise<TModelsConfig> {
     const appConfig =
@@ -124,6 +134,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
         baseURL: resolvedBaseURL,
         apiKeyIsUserProvided: isUserProvided(resolvedApiKey),
         baseURLIsUserProvided: isUserProvided(resolvedBaseURL),
+        usesAIPassOAuth: resolvedApiKey === AuthType.AIPASS_OAUTH,
       };
       resolved.push(entry);
 
@@ -172,13 +183,43 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
       baseURL: BASE_URL,
       apiKeyIsUserProvided,
       baseURLIsUserProvided,
+      usesAIPassOAuth,
     } of resolved) {
       const { models, headers: endpointHeaders } = endpoint;
       // Include a fingerprint of the configured headers so two admin-trusted
       // endpoints that happen to share the same baseURL+apiKey but configure
       // different (potentially user-bound) headers don't reuse each other's
       // fetched model list within the same request.
-      const uniqueKey = `${BASE_URL}__${API_KEY}__${headersFingerprint(endpointHeaders)}`;
+      const uniqueKey = `${BASE_URL}__${API_KEY}__${objectFingerprint(endpointHeaders)}__${objectFingerprint(models?.queryParams)}`;
+
+      if (models?.fetch && usesAIPassOAuth) {
+        const userId = req.user?.id;
+        const aipassToken = userId && getAIPassToken ? await getAIPassToken({ userId }) : null;
+        if (!aipassToken) {
+          continue;
+        }
+
+        const aipassFetchKey = `aipass:${userId}:${name}:${objectFingerprint(models.queryParams)}`;
+        const tokenKey = getTokenConfigKey(endpoint, name, userId, tenantId);
+        uniqueKeyToTokenKey[aipassFetchKey] = tokenKey;
+        fetchPromisesMap[aipassFetchKey] = fetchModels({
+          name,
+          apiKey: aipassToken,
+          baseURL: BASE_URL,
+          baseURLIsUserProvided: false,
+          allowedAddresses: appConfig.endpoints?.allowedAddresses,
+          user: userId,
+          userObject: req.user,
+          headers: endpointHeaders,
+          direct: endpoint.directEndpoint,
+          userIdQuery: models.userIdQuery,
+          queryParams: models.queryParams,
+          skipCache: true,
+          tokenKey,
+        });
+        uniqueKeyToEndpointsMap[aipassFetchKey] = [name];
+        continue;
+      }
 
       if (models?.fetch && !apiKeyIsUserProvided && !baseURLIsUserProvided) {
         if (!fetchPromisesMap[uniqueKey]) {
@@ -197,6 +238,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
             headers: endpointHeaders,
             direct: endpoint.directEndpoint,
             userIdQuery: models.userIdQuery,
+            queryParams: models.queryParams,
             tokenKey,
           });
         }
@@ -240,6 +282,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
                 headers: baseURLIsUserProvided ? undefined : endpointHeaders,
                 direct: endpoint.directEndpoint,
                 userIdQuery: models.userIdQuery,
+                queryParams: models.queryParams,
                 skipCache: true,
                 /** Fetched with the user's key/URL — always user-scoped */
                 tokenKey: getTokenConfigKey(endpoint, name, req.user?.id ?? '', tenantId),

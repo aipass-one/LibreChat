@@ -7,7 +7,10 @@ const { logger } = require('@librechat/data-schemas');
  * @returns {string}
  */
 function generateHandle(length = 24) {
-  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
+  return crypto
+    .randomBytes(Math.ceil(length / 2))
+    .toString('hex')
+    .slice(0, length);
 }
 
 /**
@@ -23,6 +26,7 @@ class AIPassStateStore {
     this.states = new Map();
     // Clean up expired states every minute
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+    this.cleanupInterval.unref?.();
   }
 
   /**
@@ -42,7 +46,7 @@ class AIPassStateStore {
       const stateData = {
         handle,
         verifier, // PKCE code_verifier
-        state,    // Original state (usually undefined)
+        state, // Original state (usually undefined)
         meta,
         createdAt: Date.now(),
         // 10 minute TTL for OAuth flow
@@ -50,7 +54,9 @@ class AIPassStateStore {
       };
 
       this.states.set(handle, stateData);
-      logger.info(`[AIPass StateStore] Stored state: ${handle.substring(0, 8)}... (${this.states.size} total)`);
+      logger.info(
+        `[AIPass StateStore] Stored state: ${handle.substring(0, 8)}... (${this.states.size} total)`,
+      );
 
       // Return the handle - this becomes the 'state' parameter in the OAuth URL
       callback(null, handle);
@@ -74,12 +80,18 @@ class AIPassStateStore {
         return callback(null, false, { message: 'No state provided' });
       }
 
-      logger.info(`[AIPass StateStore] Verifying state: ${providedState.substring(0, 8)}... (${this.states.size} in store)`);
+      logger.info(
+        `[AIPass StateStore] Verifying state: ${providedState.substring(0, 8)}... (${this.states.size} in store)`,
+      );
 
       const stateData = this.states.get(providedState);
 
       if (!stateData) {
-        logger.error(`[AIPass StateStore] State not found. Available keys: ${Array.from(this.states.keys()).map(k => k.substring(0, 8)).join(', ')}`);
+        logger.error(
+          `[AIPass StateStore] State not found. Available keys: ${Array.from(this.states.keys())
+            .map((k) => k.substring(0, 8))
+            .join(', ')}`,
+        );
         return callback(null, false, { message: 'Unable to verify authorization request state.' });
       }
 

@@ -190,6 +190,7 @@ const processAddedConvo = async ({
         listSkillsByAccess: db.listSkillsByAccess,
         listAlwaysApplySkills: db.listAlwaysApplySkills,
         getSkillByName: db.getSkillByName,
+        getAIPassToken: db.getAIPassToken,
       },
     );
 

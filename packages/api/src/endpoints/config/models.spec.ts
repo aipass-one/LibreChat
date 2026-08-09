@@ -18,6 +18,78 @@ jest.mock('~/utils', () => {
 import { SCOPED_TOKEN_CONFIG_KEY_PREFIX } from '../keys';
 import { createLoadConfigModels } from './models';
 
+describe('createLoadConfigModels – AIPass OAuth catalog', () => {
+  const fetchModels = jest.fn().mockResolvedValue(['gpt-5-mini', 'claude-haiku-4-5']);
+  const getAIPassToken = jest.fn().mockResolvedValue('aipass-access-token');
+  const getUserKeyValues = jest.fn();
+
+  const appConfig = {
+    endpoints: {
+      [EModelEndpoint.custom]: [
+        {
+          name: 'AIPass',
+          baseURL: 'https://aipass.one/oauth2/v1',
+          apiKey: AuthType.AIPASS_OAUTH,
+          models: {
+            fetch: true,
+            queryParams: { type: 'text', method: 'chat_completions' },
+          },
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    fetchModels.mockReset().mockResolvedValue(['gpt-5-mini', 'claude-haiku-4-5']);
+    getAIPassToken.mockReset().mockResolvedValue('aipass-access-token');
+    getUserKeyValues.mockReset();
+  });
+
+  it('uses the signed-in user token and forwards the chat filters', async () => {
+    const loadConfigModels = createLoadConfigModels({
+      getAppConfig: jest.fn().mockResolvedValue(appConfig),
+      getUserKeyValues,
+      getAIPassToken,
+      fetchModels,
+    });
+    const req = {
+      user: { id: 'user-1' },
+      config: undefined,
+    } as unknown as ServerRequest;
+
+    await expect(loadConfigModels(req)).resolves.toEqual({
+      AIPass: ['gpt-5-mini', 'claude-haiku-4-5'],
+    });
+    expect(getAIPassToken).toHaveBeenCalledWith({ userId: 'user-1' });
+    expect(getUserKeyValues).not.toHaveBeenCalled();
+    expect(fetchModels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'aipass-access-token',
+        baseURL: 'https://aipass.one/oauth2/v1',
+        queryParams: { type: 'text', method: 'chat_completions' },
+        skipCache: true,
+      }),
+    );
+  });
+
+  it('does not expose models when the user has no AIPass token', async () => {
+    getAIPassToken.mockResolvedValue(null);
+    const loadConfigModels = createLoadConfigModels({
+      getAppConfig: jest.fn().mockResolvedValue(appConfig),
+      getUserKeyValues,
+      getAIPassToken,
+      fetchModels,
+    });
+    const req = {
+      user: { id: 'user-1' },
+      config: undefined,
+    } as unknown as ServerRequest;
+
+    await expect(loadConfigModels(req)).resolves.toEqual({ AIPass: [] });
+    expect(fetchModels).not.toHaveBeenCalled();
+  });
+});
+
 describe('createLoadConfigModels – user-provided baseURL header guard', () => {
   const fetchModels = jest.fn().mockResolvedValue([]);
 
@@ -257,6 +329,57 @@ describe('createLoadConfigModels – in-request fetch coalescing', () => {
     }
     expect(headersByName.get('TenantA')).toEqual({ 'X-Tenant': 'a' });
     expect(headersByName.get('TenantB')).toEqual({ 'X-Tenant': 'b' });
+  });
+
+  it('does NOT coalesce endpoints with different model-catalog filters', async () => {
+    const loadConfigModels = createLoadConfigModels({
+      getAppConfig: jest.fn().mockResolvedValue({
+        endpoints: {
+          [EModelEndpoint.custom]: [
+            {
+              name: 'ChatModels',
+              baseURL: 'https://shared-proxy.example.com/v1',
+              apiKey: 'sk-shared',
+              models: {
+                fetch: true,
+                queryParams: { type: 'text', method: 'chat_completions' },
+              },
+            },
+            {
+              name: 'ImageModels',
+              baseURL: 'https://shared-proxy.example.com/v1',
+              apiKey: 'sk-shared',
+              models: {
+                fetch: true,
+                queryParams: { type: 'image', method: 'image_generation' },
+              },
+            },
+          ],
+        },
+      }),
+      getUserKeyValues: jest.fn(),
+      fetchModels,
+    });
+    const req = {
+      user: { id: 'user-1' },
+      config: undefined,
+    } as unknown as ServerRequest;
+
+    await loadConfigModels(req);
+
+    expect(fetchModels).toHaveBeenCalledTimes(2);
+    expect(fetchModels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'ChatModels',
+        queryParams: { type: 'text', method: 'chat_completions' },
+      }),
+    );
+    expect(fetchModels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'ImageModels',
+        queryParams: { type: 'image', method: 'image_generation' },
+      }),
+    );
   });
 
   it('still coalesces two endpoints that share baseURL+apiKey AND identical headers', async () => {

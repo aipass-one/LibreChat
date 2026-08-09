@@ -8,12 +8,10 @@ import {
   SamlIcon,
   AIPassIcon,
 } from '@librechat/client';
+import type { TStartupConfig } from 'librechat-data-provider';
 
 import SocialButton from './SocialButton';
-
 import { useLocalize } from '~/hooks';
-
-import { TStartupConfig } from 'librechat-data-provider';
 
 function SocialLoginRender({
   startupConfig,
@@ -136,7 +134,7 @@ function SocialLoginRender({
           <>
             <div className="relative mt-6 flex w-full items-center justify-center border border-t border-gray-300 uppercase dark:border-gray-600">
               <div className="absolute bg-white px-3 text-xs text-black dark:bg-gray-900 dark:text-white">
-                Or
+                {localize('com_auth_or')}
               </div>
             </div>
             <div className="mt-8" />

@@ -230,7 +230,9 @@ export async function initializeCustom({
   // Handle AIPass OAuth - get token from user's stored OAuth credentials
   if (usesAIPassOAuth) {
     if (!db.getAIPassToken) {
-      throw new Error(`AIPass OAuth is configured for ${endpoint} but getAIPassToken method is not available.`);
+      throw new Error(
+        `AIPass OAuth is configured for ${endpoint} but getAIPassToken method is not available.`,
+      );
     }
     apiKey = await db.getAIPassToken({ userId: req.user?.id ?? '' });
     if (!apiKey) {

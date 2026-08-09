@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { logger } = require('@librechat/data-schemas');
 const { storeAIPassTokens } = require('./tokenService');
 
 /**
@@ -22,8 +23,9 @@ async function aipassOauthHandler(req, res, next) {
           refreshToken: user.federatedTokens.refresh_token,
           expiresIn: user.federatedTokens.expires_in || 3600,
         });
-      } catch {
-        // Continue with login even if token storage fails
+      } catch (error) {
+        logger.error('[AIPass OAuth] Failed to store provider tokens', error);
+        return next(error);
       }
     }
 

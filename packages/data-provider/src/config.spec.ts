@@ -57,6 +57,53 @@ describe('bedrockEndpointSchema', () => {
   });
 });
 
+describe('custom endpoint model discovery', () => {
+  it('accepts a fetch-only model catalog with filters', () => {
+    const result = configSchema.safeParse({
+      version: '1.2.1',
+      endpoints: {
+        custom: [
+          {
+            name: 'AIPass',
+            apiKey: 'aipass_oauth',
+            baseURL: 'https://aipass.one/oauth2/v1',
+            models: {
+              fetch: true,
+              queryParams: { type: 'text', method: 'chat_completions' },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.endpoints?.custom?.[0].models).toEqual({
+        fetch: true,
+        queryParams: { type: 'text', method: 'chat_completions' },
+      });
+    }
+  });
+
+  it('rejects a custom endpoint without fetched or default models', () => {
+    const result = configSchema.safeParse({
+      version: '1.2.1',
+      endpoints: {
+        custom: [
+          {
+            name: 'EmptyCatalog',
+            apiKey: 'test-key',
+            baseURL: 'https://example.com/v1',
+            models: {},
+          },
+        ],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('resolveEndpointType', () => {
   describe('non-agents endpoints', () => {
     it('returns the config type for a custom endpoint', () => {

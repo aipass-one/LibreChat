@@ -265,6 +265,7 @@ const OpenAIChatCompletionController = async (req, res) => {
       listSkillsByAccess: skillDbMethods.listSkillsByAccess,
       listAlwaysApplySkills: skillDbMethods.listAlwaysApplySkills,
       getSkillByName: skillDbMethods.getSkillByName,
+      getAIPassToken: db.getAIPassToken,
     };
 
     const enabledCapabilities = new Set(agentsEConfig?.capabilities);

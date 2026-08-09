@@ -84,7 +84,9 @@ function Login() {
   }, [shouldAutoRedirect, shouldAutoRedirectToAIPass, startupConfig]);
 
   if (shouldAutoRedirect) {
-    const label = shouldAutoRedirectToAIPass ? startupConfig.aipassLabel : startupConfig.openidLabel;
+    const label = shouldAutoRedirectToAIPass
+      ? startupConfig.aipassLabel
+      : startupConfig.openidLabel;
     const imageUrl = shouldAutoRedirectToAIPass ? undefined : startupConfig.openidImageUrl;
     const Icon = shouldAutoRedirectToAIPass ? AIPassIcon : OpenIDIcon;
 
@@ -100,11 +102,7 @@ function Login() {
             serverDomain={startupConfig.serverDomain}
             oauthPath={autoRedirectProvider}
             Icon={() =>
-              imageUrl ? (
-                <img src={imageUrl} alt={`${label} Logo`} className="h-5 w-5" />
-              ) : (
-                <Icon />
-              )
+              imageUrl ? <img src={imageUrl} alt={`${label} Logo`} className="h-5 w-5" /> : <Icon />
             }
             label={label}
             id={autoRedirectProvider}

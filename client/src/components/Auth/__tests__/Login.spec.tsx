@@ -16,7 +16,7 @@ const mockStartupConfig = {
   isLoading: false,
   isError: false,
   data: {
-    socialLogins: ['google', 'facebook', 'openid', 'github', 'discord', 'saml'],
+    socialLogins: ['google', 'facebook', 'openid', 'github', 'discord', 'saml', 'aipass'],
     discordLoginEnabled: true,
     facebookLoginEnabled: true,
     githubLoginEnabled: true,
@@ -27,6 +27,9 @@ const mockStartupConfig = {
     samlLoginEnabled: true,
     samlLabel: 'Test SAML',
     samlImageUrl: 'http://test-server.com',
+    aipassLoginEnabled: true,
+    aipassLabel: 'Continue with AIPass',
+    aipassAutoRedirect: false,
     ldap: {
       enabled: false,
     },
@@ -150,6 +153,10 @@ test('renders login form', () => {
   expect(getByRole('link', { name: /Test SAML/i })).toHaveAttribute(
     'href',
     'mock-server/oauth/saml',
+  );
+  expect(getByRole('link', { name: /Continue with AIPass/i })).toHaveAttribute(
+    'href',
+    'mock-server/oauth/aipass',
   );
 });
 

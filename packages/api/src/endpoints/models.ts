@@ -45,6 +45,8 @@ export interface FetchModelsParams {
   azure?: boolean;
   /** Whether to send user ID as query parameter */
   userIdQuery?: boolean;
+  /** Query parameters appended to the OpenAI-compatible `/models` request */
+  queryParams?: Record<string, string | number | boolean>;
   /** Whether to create token configuration from API response */
   createTokenConfig?: boolean;
   /** Cache key for token configuration (uses name if omitted) */
@@ -160,6 +162,7 @@ export async function fetchModels({
   direct = false,
   azure = false,
   userIdQuery = false,
+  queryParams,
   createTokenConfig = true,
   tokenKey,
   headers,
@@ -192,7 +195,7 @@ export async function fetchModels({
   // resolving headers against a specific user's identity.
   const hasUserScopedHeaders = !!headers && Object.keys(headers).length > 0 && !!userObject;
   const shouldCache = !skipCache && !(userIdQuery && user) && !hasUserScopedHeaders;
-  const cacheKey = shouldCache ? modelsCacheKey(baseURL ?? '', apiKey) : '';
+  const cacheKey = shouldCache ? modelsCacheKey(baseURL ?? '', apiKey, queryParams) : '';
   const modelsCache = shouldCache ? standardCache(CacheKeys.MODEL_QUERIES) : null;
   if (modelsCache && cacheKey) {
     const cachedModels = await modelsCache.get(cacheKey);
@@ -278,6 +281,9 @@ export async function fetchModels({
     }
 
     const url = new URL(`${(baseURL ?? '').replace(/\/+$/, '')}${azure ? '' : '/models'}`);
+    for (const [key, value] of Object.entries(queryParams ?? {})) {
+      url.searchParams.set(key, String(value));
+    }
     if (user && userIdQuery) {
       url.searchParams.append('user', user);
     }
@@ -309,8 +315,19 @@ export async function fetchModels({
   return models;
 }
 
-function modelsCacheKey(baseURL: string, apiKey: string): string {
-  return crypto.createHash('sha256').update(`${baseURL}:${apiKey}`).digest('hex').slice(0, 32);
+function modelsCacheKey(
+  baseURL: string,
+  apiKey: string,
+  queryParams?: Record<string, string | number | boolean>,
+): string {
+  const orderedQuery = Object.entries(queryParams ?? {}).sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+  return crypto
+    .createHash('sha256')
+    .update(`${baseURL}:${apiKey}:${JSON.stringify(orderedQuery)}`)
+    .digest('hex')
+    .slice(0, 32);
 }
 
 /** Options for fetching OpenAI models */

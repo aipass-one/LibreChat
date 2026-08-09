@@ -174,6 +174,35 @@ describe('initializeCustom – Agents API user key resolution', () => {
 
     expect(params.db.getUserKeyValues).not.toHaveBeenCalled();
   });
+
+  it('uses the current user AIPass OAuth token for an AIPass endpoint', async () => {
+    const params = createParams({
+      apiKey: AuthType.AIPASS_OAUTH,
+      baseURL: 'https://aipass.one/oauth2/v1',
+    });
+    params.db.getAIPassToken = jest.fn().mockResolvedValue('aipass-access-token');
+
+    await initializeCustom(params);
+
+    expect(params.db.getAIPassToken).toHaveBeenCalledWith({ userId: 'user-1' });
+    expect(params.db.getUserKeyValues).not.toHaveBeenCalled();
+    expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+      'aipass-access-token',
+      expect.any(Object),
+      'test-custom',
+    );
+  });
+
+  it('rejects an AIPass endpoint when the user token is unavailable', async () => {
+    const params = createParams({
+      apiKey: AuthType.AIPASS_OAUTH,
+      baseURL: 'https://aipass.one/oauth2/v1',
+    });
+    params.db.getAIPassToken = jest.fn().mockResolvedValue(null);
+
+    await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+    expect(mockGetOpenAIConfig).not.toHaveBeenCalled();
+  });
 });
 
 describe('initializeCustom – OpenAI-compatible header forwarding', () => {

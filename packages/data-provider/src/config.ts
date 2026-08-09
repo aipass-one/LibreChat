@@ -17,7 +17,15 @@ import { FileSources } from './types/files';
 import { MCPServersSchema } from './mcp';
 export { MAX_SUBAGENTS } from './limits';
 
-export const defaultSocialLogins = ['google', 'facebook', 'openid', 'github', 'discord', 'saml', 'aipass'];
+export const defaultSocialLogins = [
+  'google',
+  'facebook',
+  'openid',
+  'github',
+  'discord',
+  'saml',
+  'aipass',
+];
 
 export const BASE_ONLY_CONFIG_SECTIONS = [] as const;
 
@@ -834,16 +842,16 @@ export const endpointSchema = baseEndpointSchema.merge(
     }),
     apiKey: z.string(),
     baseURL: z.string(),
-    models: z.object({
-      default: z.array(modelItemSchema).min(1).optional(),
-      fetch: z.boolean().optional(),
-      userIdQuery: z.boolean().optional(),
-      queryParams: z
-        .record(z.union([z.string(), z.number(), z.boolean()]))
-        .optional(),
-    }).refine((models) => models.fetch === true || (models.default?.length ?? 0) > 0, {
-      message: 'Custom endpoint models require fetch: true or at least one default model',
-    }),
+    models: z
+      .object({
+        default: z.array(modelItemSchema).min(1).optional(),
+        fetch: z.boolean().optional(),
+        userIdQuery: z.boolean().optional(),
+        queryParams: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+      })
+      .refine((models) => models.fetch === true || (models.default?.length ?? 0) > 0, {
+        message: 'Custom endpoint models require fetch: true or at least one default model',
+      }),
     iconURL: z.string().optional(),
     modelDisplayLabel: z.string().optional(),
     /**
