@@ -537,6 +537,8 @@ endpoints:
     #     nativeWebSearch:
     #       modelPrefixes: ['gemini-']
     #       pricePerQuery: 0.014
+    #       # Let non-Gemini models call this Gemini model as a web-search tool.
+    #       searchModel: 'gemini-3.5-flash-lite'
 
     # Anthropic-compatible Example (native `/v1/messages` API)
     # Set `provider: anthropic` to use the native Anthropic client instead of the

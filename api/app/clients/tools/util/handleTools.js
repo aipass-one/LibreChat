@@ -7,6 +7,8 @@ const {
   mcpToolPattern,
   loadWebSearchAuth,
   resolveAIPassImageToolAuth,
+  createAIPassWebSearchTool,
+  AIPASS_API_BASE_URL,
   getCodeApiAuthHeaders,
   buildImageToolContext,
   buildWebSearchContext,
@@ -14,10 +16,13 @@ const {
 } = require('@librechat/api');
 const {
   Tools,
+  AuthType,
   Constants,
   Permissions,
   EToolResources,
   PermissionTypes,
+  normalizeEndpointName,
+  getDelegatedWebSearchConfig,
 } = require('librechat-data-provider');
 const {
   availableTools,
@@ -350,12 +355,49 @@ const loadTools = async ({
       };
       continue;
     } else if (tool === Tools.web_search) {
+      const { onSearchResults, onGetHighlights } = options?.[Tools.web_search] ?? {};
+      const provider = agent?.provider ?? endpoint ?? options.req?.body?.endpoint;
+      const selectedModel = agent?.model ?? model ?? options.req?.body?.model;
+      const customEndpoints = options.req?.config?.endpoints?.custom;
+      const endpointConfig = Array.isArray(customEndpoints)
+        ? customEndpoints.find(
+            (candidate) =>
+              normalizeEndpointName(candidate.name) === normalizeEndpointName(provider),
+          )
+        : undefined;
+      const delegatedSearch = getDelegatedWebSearchConfig(
+        endpointConfig?.customParams,
+        selectedModel,
+      );
+      const usesAIPassDelegatedSearch =
+        delegatedSearch?.searchModel && endpointConfig?.apiKey === AuthType.AIPASS_OAUTH;
+
+      if (usesAIPassDelegatedSearch) {
+        requestedTools[tool] = async () => {
+          const apiKey = await getAIPassToken({ userId: user });
+          if (!apiKey) {
+            throw new Error('AI Pass authentication required. Please sign in with AI Pass.');
+          }
+          toolContextMap[tool] = buildWebSearchContext();
+          dynamicToolContextMap[tool] = buildWebSearchDynamicContext(
+            options.req?.conversationCreatedAt,
+          );
+          return createAIPassWebSearchTool({
+            apiKey,
+            searchModel: delegatedSearch.searchModel,
+            baseURL: endpointConfig.baseURL || AIPASS_API_BASE_URL,
+            signal,
+            onSearchResults,
+          });
+        };
+        continue;
+      }
+
       const result = await loadWebSearchAuth({
         userId: user,
         loadAuthValues,
         webSearchConfig: webSearch,
       });
-      const { onSearchResults, onGetHighlights } = options?.[Tools.web_search] ?? {};
       requestedTools[tool] = async () => {
         toolContextMap[tool] = buildWebSearchContext();
         dynamicToolContextMap[tool] = buildWebSearchDynamicContext(

@@ -883,6 +883,11 @@ export const endpointSchema = baseEndpointSchema.merge(
           .object({
             modelPrefixes: z.array(z.string().min(1)).min(1),
             pricePerQuery: z.number().nonnegative().optional(),
+            /**
+             * Optional Gemini model that provides grounded search results to
+             * nonmatching models through LibreChat's `web_search` function.
+             */
+            searchModel: z.string().min(1).optional(),
           })
           .strict()
           .optional(),

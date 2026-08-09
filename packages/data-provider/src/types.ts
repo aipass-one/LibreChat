@@ -461,6 +461,7 @@ export type TConfig = {
     nativeWebSearch?: {
       modelPrefixes: string[];
       pricePerQuery?: number;
+      searchModel?: string;
     };
     paramDefinitions?: Partial<SettingDefinition>[];
   };
@@ -477,6 +478,17 @@ export function getNativeWebSearchConfig(
 
   const normalizedModel = model.replace(/^~/, '');
   return config.modelPrefixes.some((prefix) => normalizedModel.startsWith(prefix)) ? config : null;
+}
+
+export function getDelegatedWebSearchConfig(
+  customParams: TConfig['customParams'] | null | undefined,
+  model: string | null | undefined,
+): NonNullable<NonNullable<TConfig['customParams']>['nativeWebSearch']> | null {
+  const config = customParams?.nativeWebSearch;
+  if (!config?.searchModel || getNativeWebSearchConfig(customParams, model)) {
+    return null;
+  }
+  return config;
 }
 
 export type TEndpointsConfig =

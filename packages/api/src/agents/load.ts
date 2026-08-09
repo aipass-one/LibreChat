@@ -5,6 +5,7 @@ import {
   isEphemeralAgentId,
   encodeEphemeralAgentId,
   getNativeWebSearchConfig,
+  getDelegatedWebSearchConfig,
   normalizeEndpointName,
 } from 'librechat-data-provider';
 import type {
@@ -91,8 +92,12 @@ export async function loadEphemeralAgent(
   }
   const webSearchSelected = ephemeralAgent?.web_search === true || modelSpec?.webSearch === true;
   const nativeWebSearch = getNativeWebSearchConfig(endpointConfig?.customParams, model as string);
+  const delegatedWebSearch = getDelegatedWebSearchConfig(
+    endpointConfig?.customParams,
+    model as string,
+  );
   const endpointUsesNativeWebSearch = endpointConfig?.customParams?.nativeWebSearch != null;
-  if (webSearchSelected && !endpointUsesNativeWebSearch) {
+  if (webSearchSelected && (!endpointUsesNativeWebSearch || delegatedWebSearch)) {
     tools.push(Tools.web_search);
   }
 

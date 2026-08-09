@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getNativeWebSearchConfig } from 'librechat-data-provider';
+import { getDelegatedWebSearchConfig, getNativeWebSearchConfig } from 'librechat-data-provider';
 import { useGetEndpointsQuery } from '~/data-provider';
 import { useChatContext } from '~/Providers/ChatContext';
 
@@ -11,12 +11,19 @@ export default function useNativeWebSearch() {
 
   return useMemo(() => {
     const nativeWebSearch = endpointsConfig?.[endpoint]?.customParams?.nativeWebSearch;
-    const config = getNativeWebSearchConfig(endpointsConfig?.[endpoint]?.customParams, model);
+    const nativeConfig = getNativeWebSearchConfig(endpointsConfig?.[endpoint]?.customParams, model);
+    const delegatedConfig = getDelegatedWebSearchConfig(
+      endpointsConfig?.[endpoint]?.customParams,
+      model,
+    );
+    const config = nativeConfig ?? delegatedConfig;
 
     return {
       isManaged: nativeWebSearch != null,
       isAvailable: config != null,
+      isNative: nativeConfig != null,
       pricePerQuery: config?.pricePerQuery,
+      searchModel: delegatedConfig?.searchModel,
     };
   }, [endpoint, endpointsConfig, model]);
 }

@@ -1,4 +1,4 @@
-import { getNativeWebSearchConfig } from './types';
+import { getDelegatedWebSearchConfig, getNativeWebSearchConfig } from './types';
 import type { TEndpointsConfig } from './types';
 import { EModelEndpoint, isDocumentSupportedProvider } from './schemas';
 import { getEndpointFileConfig, mergeFileConfig } from './file-config';
@@ -118,6 +118,7 @@ describe('custom endpoint model discovery', () => {
               nativeWebSearch: {
                 modelPrefixes: ['gemini-'],
                 pricePerQuery: 0.014,
+                searchModel: 'gemini-3.5-flash-lite',
               },
             },
           },
@@ -133,8 +134,15 @@ describe('custom endpoint model discovery', () => {
     expect(getNativeWebSearchConfig(config, 'gemini-3.6-flash')).toEqual({
       modelPrefixes: ['gemini-'],
       pricePerQuery: 0.014,
+      searchModel: 'gemini-3.5-flash-lite',
     });
     expect(getNativeWebSearchConfig(config, 'gpt-5.4-mini')).toBeNull();
+    expect(getDelegatedWebSearchConfig(config, 'gpt-5.4-mini')).toEqual({
+      modelPrefixes: ['gemini-'],
+      pricePerQuery: 0.014,
+      searchModel: 'gemini-3.5-flash-lite',
+    });
+    expect(getDelegatedWebSearchConfig(config, 'gemini-3.6-flash')).toBeNull();
   });
 });
 

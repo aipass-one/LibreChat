@@ -144,6 +144,7 @@ describe('loadAgent', () => {
                 nativeWebSearch: {
                   modelPrefixes: ['gemini-'],
                   pricePerQuery: 0.014,
+                  searchModel: 'gemini-3.5-flash-lite',
                 },
               },
             },
@@ -167,6 +168,45 @@ describe('loadAgent', () => {
 
     expect(result?.model_parameters).toEqual(expect.objectContaining({ web_search: true }));
     expect(result?.tools).not.toContain('web_search');
+  });
+
+  test('gives non-Gemini models the AI Pass delegated search tool', async () => {
+    const mockReq = {
+      user: { id: 'user123' },
+      config: {
+        endpoints: {
+          custom: [
+            {
+              name: 'AIPass',
+              apiKey: 'aipass_oauth',
+              baseURL: 'https://aipass.one/v1',
+              models: { default: ['gpt-5.4-mini'] },
+              customParams: {
+                nativeWebSearch: {
+                  modelPrefixes: ['gemini-'],
+                  pricePerQuery: 0.014,
+                  searchModel: 'gemini-3.5-flash-lite',
+                },
+              },
+            },
+          ],
+        },
+      } as unknown as AppConfig,
+      body: { ephemeralAgent: { web_search: true } },
+    };
+
+    const result = await loadAgent(
+      {
+        req: mockReq,
+        agent_id: Constants.EPHEMERAL_AGENT_ID as string,
+        endpoint: 'AIPass',
+        model_parameters: { model: 'gpt-5.4-mini' } as unknown as AgentModelParameters,
+      },
+      deps,
+    );
+
+    expect(result?.model_parameters).not.toHaveProperty('web_search');
+    expect(result?.tools).toContain('web_search');
   });
 
   test('does not fall back to third-party search for unsupported native-search models', async () => {
