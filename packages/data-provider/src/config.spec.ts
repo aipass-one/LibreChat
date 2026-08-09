@@ -66,7 +66,7 @@ describe('custom endpoint model discovery', () => {
           {
             name: 'AIPass',
             apiKey: 'aipass_oauth',
-            baseURL: 'https://aipass.one/oauth2/v1',
+            baseURL: 'https://aipass.one/v1',
             models: {
               fetch: true,
               queryParams: { type: 'text', method: 'chat_completions' },

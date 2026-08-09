@@ -178,7 +178,7 @@ describe('initializeCustom – Agents API user key resolution', () => {
   it('uses the current user AIPass OAuth token for an AIPass endpoint', async () => {
     const params = createParams({
       apiKey: AuthType.AIPASS_OAUTH,
-      baseURL: 'https://aipass.one/oauth2/v1',
+      baseURL: 'https://aipass.one/v1',
     });
     params.db.getAIPassToken = jest.fn().mockResolvedValue('aipass-access-token');
 
@@ -196,7 +196,7 @@ describe('initializeCustom – Agents API user key resolution', () => {
   it('rejects an AIPass endpoint when the user token is unavailable', async () => {
     const params = createParams({
       apiKey: AuthType.AIPASS_OAUTH,
-      baseURL: 'https://aipass.one/oauth2/v1',
+      baseURL: 'https://aipass.one/v1',
     });
     params.db.getAIPassToken = jest.fn().mockResolvedValue(null);
 

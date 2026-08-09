@@ -9,10 +9,11 @@ AI Pass as a literal credential.
 The AI Pass custom endpoint discovers chat models at runtime from:
 
 ```text
-GET /oauth2/v1/models?type=text&method=chat_completions
+GET /v1/models?type=text&method=chat_completions
 ```
 
-Only the OAuth Bearer token is sent. No compatibility client-id header is required.
+The canonical `/v1` API identifies the Bearer credential as an OAuth token or an API key. LibreChat
+sends the signed-in user's OAuth token; no compatibility client-id header is required.
 
 ## Image generation and editing
 
@@ -24,8 +25,8 @@ At tool initialization, LibreChat resolves the user's OAuth token and discovers 
 available models separately:
 
 ```text
-GET /oauth2/v1/models?type=image&method=image_generation
-GET /oauth2/v1/models?type=image&method=image_edit
+GET /v1/models?type=image&method=image_generation
+GET /v1/models?type=image&method=image_edit
 ```
 
 The agent can select only a model returned by the corresponding catalog. If catalog discovery is
