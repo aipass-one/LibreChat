@@ -1,0 +1,48 @@
+# AI Pass integration
+
+This fork keeps provider access tied to the signed-in user's AI Pass OAuth account. The marker
+`aipass_oauth` is resolved at request time to that user's current access token and is never sent to
+AI Pass as a literal credential.
+
+## Chat models
+
+The AI Pass custom endpoint discovers chat models at runtime from:
+
+```text
+GET /oauth2/v1/models?type=text&method=chat_completions
+```
+
+Only the OAuth Bearer token is sent. No compatibility client-id header is required.
+
+## Image generation and editing
+
+`AI Pass Image Studio` is enabled by default in the Docker configurations. Add it to a LibreChat
+Agent from the Agent Builder's Tools list. It provides both text-to-image generation and
+multi-image editing.
+
+At tool initialization, LibreChat resolves the user's OAuth token and discovers the currently
+available models separately:
+
+```text
+GET /oauth2/v1/models?type=image&method=image_generation
+GET /oauth2/v1/models?type=image&method=image_edit
+```
+
+The agent can select only a model returned by the corresponding catalog. If catalog discovery is
+temporarily unavailable, the stable defaults are `nano-banana-2` for generation and
+`nano-banana-2-edit` for editing. Operators can pin alternatives with
+`IMAGE_GEN_OAI_MODEL` and `IMAGE_EDIT_OAI_MODEL`.
+
+The integration accepts either `url` or `b64_json` image responses and sends repeated AI
+Pass-compatible `image` multipart fields for multi-image edits.
+
+## Files and retrieval
+
+LibreChat Agents already expose full-document context through the `context` capability. Those
+documents are parsed and included in the request sent to the selected AI Pass chat model, so this
+path keeps model usage on the user's account without requiring embeddings.
+
+The stock LibreChat RAG container is different: it initializes one process-wide embedding API key.
+It cannot safely resolve `aipass_oauth` independently for concurrent users, so do not set
+`RAG_OPENAI_API_KEY=aipass_oauth`. Per-user AI Pass semantic RAG requires a request-scoped
+credential extension in the RAG service before it can be enabled without misattributing usage.

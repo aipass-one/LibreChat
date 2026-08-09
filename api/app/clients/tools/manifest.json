@@ -31,16 +31,16 @@
     ]
   },
   {
-    "name": "OpenAI Image Tools",
+    "name": "AI Pass Image Studio",
     "pluginKey": "image_gen_oai",
     "toolkit": true,
-    "description": "Image Generation and Editing using OpenAI's latest state-of-the-art models",
+    "description": "Generate and edit images with the models available through your AI Pass account",
     "icon": "assets/image_gen_oai.png",
     "authConfig": [
       {
         "authField": "IMAGE_GEN_OAI_API_KEY",
-        "label": "OpenAI Image Tools API Key",
-        "description": "Your OpenAI API Key for Image Generation and Editing"
+        "label": "Image API credential",
+        "description": "Uses your signed-in AI Pass account on this deployment"
       }
     ]
   },

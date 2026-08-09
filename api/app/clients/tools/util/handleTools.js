@@ -6,6 +6,7 @@ const {
   createSafeUser,
   mcpToolPattern,
   loadWebSearchAuth,
+  resolveAIPassImageToolAuth,
   getCodeApiAuthHeaders,
   buildImageToolContext,
   buildWebSearchContext,
@@ -48,7 +49,7 @@ const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools } = require('~/server/services/Config');
 const { getMCPServersRegistry } = require('~/config');
-const { getRoleByName } = require('~/models');
+const { getRoleByName, getAIPassToken } = require('~/models');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -191,6 +192,12 @@ const loadTools = async ({
     image_gen_oai: async (_toolContextMap, dynamicToolContextMap) => {
       const authFields = getAuthFields('image_gen_oai');
       const authValues = await loadAuthValues({ userId: user, authFields });
+      const imageAuth = await resolveAIPassImageToolAuth({
+        configuredApiKey: authValues.IMAGE_GEN_OAI_API_KEY,
+        configuredBaseURL: process.env.IMAGE_GEN_OAI_BASEURL,
+        userId: user,
+        getAIPassToken,
+      });
       const imageFiles = options.tool_resources?.[EToolResources.image_edit]?.files ?? [];
       const toolContext = buildImageToolContext({
         imageFiles,
@@ -202,6 +209,11 @@ const loadTools = async ({
       }
       return createOpenAIImageTools({
         ...authValues,
+        IMAGE_GEN_OAI_API_KEY: imageAuth.apiKey,
+        IMAGE_GEN_OAI_BASEURL: imageAuth.baseURL,
+        usesAIPassOAuth: imageAuth.usesAIPassOAuth,
+        imageGenerationModels: imageAuth.generationModels,
+        imageEditModels: imageAuth.editModels,
         isAgent: !!agent,
         req: options.req,
         imageOutputType,

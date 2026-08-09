@@ -1,5 +1,10 @@
 const OpenAI = require('openai');
+const axios = require('axios');
+const { Readable } = require('stream');
 const createOpenAIImageTools = require('~/app/clients/tools/structured/OpenAIImageTools');
+const {
+  getStrategyFunctions: mockGetStrategyFunctions,
+} = require('~/server/services/Files/strategies');
 
 jest.mock('openai');
 jest.mock('@librechat/data-schemas', () => ({
@@ -27,6 +32,8 @@ jest.mock('@librechat/api', () => ({
   extractBaseURL: jest.fn((url) => url),
   getProxyDispatcher: jest.fn(() => undefined),
   applyAxiosProxyConfig: jest.fn(),
+  AIPASS_DEFAULT_IMAGE_GENERATION_MODEL: 'nano-banana-2',
+  AIPASS_DEFAULT_IMAGE_EDIT_MODEL: 'nano-banana-2-edit',
 }));
 
 jest.mock('~/server/services/Files/strategies', () => ({
@@ -60,6 +67,7 @@ describe('OpenAIImageTools - IMAGE_GEN_OAI_MODEL environment variable', () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     process.env = originalEnv;
   });
 
@@ -160,5 +168,137 @@ describe('OpenAIImageTools - IMAGE_GEN_OAI_MODEL environment variable', () => {
       }),
       expect.any(Object),
     );
+  });
+
+  it('uses a discovered AI Pass model selected by the agent', async () => {
+    delete process.env.IMAGE_GEN_OAI_MODEL;
+    const mockGenerate = jest.fn().mockResolvedValue({
+      data: [{ url: 'https://cdn.example/generated.png' }],
+    });
+    OpenAI.mockImplementation(() => ({ images: { generate: mockGenerate } }));
+
+    const [imageGenTool] = createOpenAIImageTools({
+      isAgent: true,
+      req: { user: { id: 'test-user' } },
+      usesAIPassOAuth: true,
+      IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
+      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/oauth2/v1',
+      imageGenerationModels: ['nano-banana-2', 'imagen-4-ultra'],
+    });
+
+    const result = await imageGenTool.func({
+      model: 'imagen-4-ultra',
+      prompt: 'a city at sunset',
+    });
+
+    expect(mockGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'imagen-4-ultra' }),
+      expect.any(Object),
+    );
+    expect(result[1].content[0].image_url.url).toBe('https://cdn.example/generated.png');
+  });
+
+  it('uses the preferred AI Pass model when no image model is requested', async () => {
+    delete process.env.IMAGE_GEN_OAI_MODEL;
+    const mockGenerate = jest.fn().mockResolvedValue({
+      data: [{ b64_json: 'generated-image' }],
+    });
+    OpenAI.mockImplementation(() => ({ images: { generate: mockGenerate } }));
+
+    const [imageGenTool] = createOpenAIImageTools({
+      isAgent: true,
+      req: { user: { id: 'test-user' } },
+      usesAIPassOAuth: true,
+      IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
+      imageGenerationModels: ['imagen-4-ultra', 'nano-banana-2'],
+    });
+
+    await imageGenTool.func({ prompt: 'a lighthouse' });
+
+    expect(mockGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'nano-banana-2' }),
+      expect.any(Object),
+    );
+  });
+
+  it('falls back to the stable AI Pass model when catalog discovery is unavailable', async () => {
+    delete process.env.IMAGE_GEN_OAI_MODEL;
+    const mockGenerate = jest.fn().mockResolvedValue({
+      data: [{ b64_json: 'generated-image' }],
+    });
+    OpenAI.mockImplementation(() => ({ images: { generate: mockGenerate } }));
+
+    const [imageGenTool] = createOpenAIImageTools({
+      isAgent: true,
+      req: { user: { id: 'test-user' } },
+      usesAIPassOAuth: true,
+      IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
+      imageGenerationModels: [],
+    });
+
+    await imageGenTool.func({ prompt: 'a lighthouse' });
+
+    expect(mockGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'nano-banana-2' }),
+      expect.any(Object),
+    );
+  });
+
+  it('passes a request-scoped AI Pass base URL to the OpenAI-compatible client', async () => {
+    const [imageGenTool] = createOpenAIImageTools({
+      isAgent: true,
+      req: { user: { id: 'test-user' } },
+      IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
+      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/oauth2/v1',
+    });
+
+    await imageGenTool.func({ prompt: 'a mountain' });
+
+    expect(OpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'user-oauth-token',
+        baseURL: 'https://aipass.one/oauth2/v1',
+      }),
+    );
+  });
+
+  it('uses the AI Pass edit catalog, multipart field, and URL response', async () => {
+    delete process.env.IMAGE_EDIT_OAI_MODEL;
+    mockGetStrategyFunctions.mockReturnValue({
+      getDownloadStream: jest.fn().mockResolvedValue(Readable.from(Buffer.from('image-bytes'))),
+    });
+    const post = jest.spyOn(axios, 'post').mockResolvedValue({
+      data: { data: [{ url: 'https://cdn.example/edited.png' }] },
+    });
+
+    const [, imageEditTool] = createOpenAIImageTools({
+      isAgent: true,
+      req: { user: { id: 'test-user' } },
+      usesAIPassOAuth: true,
+      IMAGE_GEN_OAI_API_KEY: 'user-oauth-token',
+      IMAGE_GEN_OAI_BASEURL: 'https://aipass.one/oauth2/v1',
+      imageEditModels: ['gpt-image-2-edit', 'nano-banana-2-edit'],
+      imageFiles: [
+        {
+          file_id: 'image-1',
+          source: 'local',
+          filepath: '/uploads/image.png',
+          filename: 'image.png',
+          type: 'image/png',
+        },
+      ],
+    });
+
+    const result = await imageEditTool.func({
+      prompt: 'make the sky blue',
+      image_ids: ['image-1'],
+    });
+
+    const formData = post.mock.calls[0][1];
+    const multipartHeaders = formData._streams.filter((part) => typeof part === 'string').join('');
+    expect(multipartHeaders).toContain('name="image"');
+    expect(multipartHeaders).not.toContain('name="image[]"');
+    expect(multipartHeaders).toContain('nano-banana-2-edit');
+    expect(result[1].content[0].image_url.url).toBe('https://cdn.example/edited.png');
   });
 });
