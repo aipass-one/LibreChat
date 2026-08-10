@@ -18,6 +18,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+
+      - name: Build architecture-neutral frontend artifacts
+        run: |
+          npm ci --no-audit
+          npm run frontend
+          test -s client/dist/index.html
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -62,5 +74,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           target: node
+          build-args: |
+            USE_PREBUILT_FRONTEND=true
           cache-from: type=gha
           cache-to: type=gha,mode=max

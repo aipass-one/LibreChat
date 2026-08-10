@@ -18,6 +18,7 @@ RUN uv --version
 ARG NODE_MAX_OLD_SPACE_SIZE=6144
 ARG NPM_CI_TIMEOUT_SECONDS=1500
 ARG NPM_CI_ATTEMPTS=2
+ARG USE_PREBUILT_FRONTEND=false
 
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
@@ -53,9 +54,18 @@ RUN \
 
 COPY --chown=node:node . .
 
+# The AI Pass release builds these architecture-neutral assets on the native
+# GitHub runner so ARM images do not run Vite through QEMU.
 RUN set -eu; \
-    # React client build with configurable memory
-    NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend; \
+    if [ "${USE_PREBUILT_FRONTEND}" = "true" ]; then \
+        echo "Using architecture-neutral frontend artifacts from the build context"; \
+        test -s /app/packages/data-provider/dist/index.js; \
+        test -s /app/packages/data-schemas/dist/index.cjs; \
+        test -s /app/packages/api/dist/index.cjs; \
+        test -s /app/packages/client/dist/index.cjs; \
+    else \
+        NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend; \
+    fi; \
     test -s /app/client/dist/index.html; \
     npm prune --production; \
     npm cache clean --force
