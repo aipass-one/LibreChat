@@ -41,6 +41,7 @@ jest.mock('@librechat/api', () => {
     sanitizeFilename: jest.fn((n) => n),
     parseText: jest.fn().mockResolvedValue({ text: '', bytes: 0 }),
     processAudioFile: jest.fn(),
+    fetchRemoteImageBuffer: jest.fn(),
     getStorageMetadata: jest.fn(() => ({})),
     getRetentionExpiry,
     getAgentFileRetentionExpiry: jest.fn(({ req, messageAttachment, toolResource }) => {
@@ -130,6 +131,7 @@ const {
   getAgentFileRetentionExpiry,
   sweepExpiredFiles: sweepExpiredFilesWithDeps,
   startExpiredFileSweep: startExpiredFileSweepWithDeps,
+  fetchRemoteImageBuffer,
 } = require('@librechat/api');
 const {
   EToolResources,
@@ -149,6 +151,7 @@ const {
   processFileURL,
   sweepExpiredFiles,
   startExpiredFileSweep,
+  saveBase64Image,
 } = require('./process');
 
 const PDF_MIME = 'application/pdf';
@@ -205,6 +208,93 @@ const setupStoredFileUpload = (result = {}) => {
   getStrategyFunctions.mockReturnValue({ handleFileUpload });
   return handleFileUpload;
 };
+
+describe('saveBase64Image', () => {
+  const { resizeImageBuffer } = require('~/server/services/Files/images');
+  const { determineFileType } = require('~/server/utils');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getStrategyFunctions.mockReturnValue({
+      saveBuffer: jest.fn().mockResolvedValue('/uploads/generated.png'),
+    });
+    resizeImageBuffer.mockResolvedValue({
+      buffer: Buffer.from('resized'),
+      bytes: 7,
+      width: 512,
+      height: 512,
+    });
+  });
+
+  it('downloads and persists an HTTPS tool image as a normal image attachment', async () => {
+    const inputBuffer = Buffer.from('remote-image');
+    fetchRemoteImageBuffer.mockResolvedValue(inputBuffer);
+    determineFileType.mockResolvedValue({ ext: 'png', mime: 'image/png' });
+    const req = makeReq();
+
+    await saveBase64Image('https://cdn.example.com/generated.png', {
+      req,
+      file_id: 'generated-file-id',
+      filename: 'image_gen_img_abc',
+      endpoint: 'google',
+      context: FileContext.image_generation,
+    });
+
+    expect(fetchRemoteImageBuffer).toHaveBeenCalledWith('https://cdn.example.com/generated.png');
+    expect(determineFileType).toHaveBeenCalledWith(inputBuffer, true);
+    expect(resizeImageBuffer).toHaveBeenCalledWith(inputBuffer, 'high', 'google');
+    expect(db.createFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file_id: 'generated-file-id',
+        filename: 'generated-file-id-image_gen_img_abc.png',
+        type: 'image/png',
+        filepath: '/uploads/generated.png',
+        context: FileContext.image_generation,
+      }),
+      true,
+    );
+  });
+
+  it('continues to persist inline base64 tool images without a remote fetch', async () => {
+    const inputBuffer = Buffer.from('inline-image');
+    const dataUrl = `data:image/png;base64,${inputBuffer.toString('base64')}`;
+
+    await saveBase64Image(dataUrl, {
+      req: makeReq(),
+      file_id: 'inline-file-id',
+      filename: 'image_gen_img_inline',
+      endpoint: 'google',
+      context: FileContext.image_generation,
+    });
+
+    expect(fetchRemoteImageBuffer).not.toHaveBeenCalled();
+    expect(determineFileType).not.toHaveBeenCalled();
+    expect(resizeImageBuffer).toHaveBeenCalledWith(inputBuffer, 'high', 'google');
+    expect(db.createFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file_id: 'inline-file-id',
+        filename: 'inline-file-id-image_gen_img_inline.png',
+        type: 'image/png',
+      }),
+      true,
+    );
+  });
+
+  it('rejects a remote response whose detected bytes are not an image', async () => {
+    fetchRemoteImageBuffer.mockResolvedValue(Buffer.from('<html>not an image</html>'));
+    determineFileType.mockResolvedValue({ ext: 'html', mime: 'text/html' });
+
+    await expect(
+      saveBase64Image('https://cdn.example.com/generated.png', {
+        req: makeReq(),
+        filename: 'image_gen_img_abc',
+        endpoint: 'google',
+      }),
+    ).rejects.toThrow('did not return a supported image');
+    expect(resizeImageBuffer).not.toHaveBeenCalled();
+    expect(db.createFile).not.toHaveBeenCalled();
+  });
+});
 
 describe('processAgentFileUpload', () => {
   beforeEach(() => {

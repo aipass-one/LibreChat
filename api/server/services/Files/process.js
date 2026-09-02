@@ -23,6 +23,7 @@ const {
   sanitizeFilename,
   parseText,
   processAudioFile,
+  fetchRemoteImageBuffer,
   getStorageMetadata,
   sweepExpiredFiles: sweepExpiredFilesWithDeps,
   startExpiredFileSweep: startExpiredFileSweepWithDeps,
@@ -1208,9 +1209,27 @@ async function saveBase64Image(
   const effectiveResolution = resolution ?? appConfig.fileConfig?.imageGeneration ?? 'high';
   const file_id = _file_id ?? v4();
   let filename = `${file_id}-${_filename}`;
-  const { buffer: inputBuffer, type } = base64ToBuffer(url);
+  let inputBuffer;
+  let type;
+  let detectedExtension;
+
+  if (url.startsWith('data:')) {
+    ({ buffer: inputBuffer, type } = base64ToBuffer(url));
+  } else {
+    inputBuffer = await fetchRemoteImageBuffer(url);
+    const detectedType = await determineFileType(inputBuffer, true);
+    detectedExtension = detectedType?.ext;
+    type = detectedType?.mime;
+    if (!detectedExtension || !type?.startsWith('image/')) {
+      throw new Error('Remote image URL did not return a supported image');
+    }
+    if (!imageExtRegex.test(`.${detectedExtension}`)) {
+      throw new Error(`Unsupported remote image type: ${type}`);
+    }
+  }
+
   if (!path.extname(_filename)) {
-    const extension = mime.getExtension(type);
+    const extension = detectedExtension ?? mime.getExtension(type);
     if (extension) {
       filename += `.${extension}`;
     } else {
