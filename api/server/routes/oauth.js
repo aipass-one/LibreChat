@@ -232,7 +232,7 @@ router.get(
   '/aipass/callback',
   passport.authenticate('aipass', {
     failureRedirect: `${domains.client}/oauth/error`,
-    failureMessage: true,
+    failureMessage: false,
     session: false,
   }),
   setBalanceConfig,

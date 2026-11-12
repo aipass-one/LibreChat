@@ -1,0 +1,5 @@
+FROM ghcr.io/aipass-one/librechat@sha256:7681d8de5e708f784fc2f629578507fd5f8b01cde66560328d0ee3f2780cd2e2
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=$SOURCE_REVISION
+LABEL org.opencontainers.image.base.digest="sha256:7681d8de5e708f784fc2f629578507fd5f8b01cde66560328d0ee3f2780cd2e2"
+COPY --chown=node:node api/server/routes/oauth.js /app/api/server/routes/oauth.js
